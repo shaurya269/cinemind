@@ -1,0 +1,23 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY src/ src/
+COPY backend/ backend/
+
+# Render's free tier has no persistent volumes and no sibling services
+# (Qdrant/Postgres/Redis/Neo4j) -- unlike backend/docker-compose.yml, which
+# bind-mounts data/ and artifacts/ at runtime, this image bakes them in
+# directly. They're ~22MB total (see CLAUDE.md), so this is fine for a
+# single-service deploy. recommender.py/graph.py/feedback.py already
+# degrade gracefully with no Qdrant/Redis/Neo4j/Postgres reachable (numpy
+# fallback, SQLite fallback, graph disabled) -- see their module docstrings.
+COPY data/ data/
+COPY artifacts/ artifacts/
+
+EXPOSE 10000
+# Render injects $PORT at runtime; default to 10000 for local testing of this image.
+CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-10000}"]

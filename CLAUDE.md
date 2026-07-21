@@ -212,24 +212,41 @@ backend/
   feedback.py              # Feedback capture -> Postgres
   graph.py                 # Neo4j queries -- graph_insights() for GET /graph/insights
   docker-compose.yml       # API + Qdrant + Postgres + Redis + Neo4j (Langfuse Cloud, not self-hosted)
+  Dockerfile.render        # Render deploy: single-service image, bakes in data/+artifacts/
+                            # (no volumes on Render's free tier), no Qdrant/Postgres/Redis/
+                            # Neo4j sidecars -- recommender.py/graph.py/feedback.py already
+                            # degrade gracefully without them. See render.yaml (project root).
 ```
 
 ### Phase 3 — React frontend
+Cinematic dark/light theme (Bebas Neue display + Inter body + mono for
+scores/ids), a marquee-red accent -- built and verified, see below.
 ```
 frontend/
   src/
     api.js                     # Fetch client for all FastAPI routes
+    hooks/
+      useTheme.js               # Light/dark toggle, persisted in localStorage
+      useWatchlist.js           # Favorites/watchlist, localStorage-backed, cross-component via a tiny listener set
     components/
-      RecommendationCard.jsx    # Poster + score + "Why this?" + Graph insights
-      ChatSearch.jsx            # Conversational search input
+      RecommendationCard.jsx    # Poster + score + watchlist star + "Why this?" + Graph insights
+      ChatSearch.jsx            # Conversational search input + suggestion chips
       OnboardingWizard.jsx      # Cold-start dialogue flow
       ExplainPanel.jsx          # Detailed explanation panel
       GraphInsights.jsx          # Co-raters + shared-genre movies via Neo4j
+      MovieModal.jsx             # Full-detail poster/plot/cast modal, opened from a card
+      GenreFilter.jsx            # Genre chip filter over a result grid
+      SkeletonCard.jsx           # Shimmer loading placeholders
     pages/
-      Home.jsx
+      Landing.jsx                # Hero + "how it works" + stat row, the "/" route
+      Home.jsx                   # Returning-user recs, the "/app" route
       Search.jsx
       Profile.jsx
+      Watchlist.jsx               # Saved movies, the "/watchlist" route
 ```
+Deployment: `frontend/vercel.json` (SPA rewrite for react-router),
+`frontend/.env.example` (`VITE_API_BASE`) -- see Phase 2's Render note below
+and `SETUP_GUIDE.md` Section 9.5 for the full Vercel + Render walkthrough.
 
 ### Phase 3.5 — Streamlit public demo (parallel deployment track)
 The React/FastAPI stack above remains the primary product architecture. Streamlit
@@ -277,9 +294,21 @@ Notes:
 - [x] FastAPI backend (`backend/`) -- all 7 routes, Docker Compose stack, CORS
 - [x] React frontend (`frontend/`) -- all components/pages, verified in a real
       browser via Playwright against the live Docker API
+- [x] React redesign -- cinematic dark/light theme, landing page, watchlist,
+      genre filter, movie detail modal, skeleton loaders; verified in a real
+      browser via Playwright screenshots (light/dark/mobile)
 - [x] Streamlit public demo (`streamlit_app/app.py`) -- verified locally in browser
+- [x] `backend/Dockerfile.render` + `render.yaml` -- single-service Render deploy,
+      built and smoke-tested locally with `docker build`/`docker run`: `/health`
+      and `/recommendations/{id}` confirmed working with no Qdrant/Postgres/
+      Redis/Neo4j reachable (numpy fallback, SQLite fallback, graph disabled)
+- [x] `frontend/vercel.json` + `.env.example` -- Vercel deploy config for the
+      React app (SPA rewrite, `VITE_API_BASE`)
 
 ## What's genuinely left
+- [ ] Actually click "Deploy" on Render and Vercel (config is written and
+      smoke-tested locally, but neither service has been deployed yet --
+      see `SETUP_GUIDE.md` Section 9.5)
 - [ ] Deploy the Streamlit app to Streamlit Community Cloud (public link)
 - [ ] The remaining ~134 unmatched movies in OMDb enrichment (obscure titles;
       may just not exist in OMDb's catalogue)

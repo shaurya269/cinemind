@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { onboard } from "../api";
 import RecommendationCard from "./RecommendationCard";
+import { SkeletonGrid } from "./SkeletonCard";
 
 export default function OnboardingWizard() {
   const [answers, setAnswers] = useState(
@@ -31,20 +32,24 @@ export default function OnboardingWizard() {
         first recommendations from content alone -- no collaborative history
         required.
       </p>
-      <form className="search-form" onSubmit={handleSubmit}>
-        <label htmlFor="onboarding-answers">Taste notes</label>
-        <textarea
-          id="onboarding-answers"
-          rows={4}
-          value={answers}
-          onChange={(e) => setAnswers(e.target.value)}
-        />
+      <form className="search-form search-form-stacked" onSubmit={handleSubmit}>
+        <div className="field field-grow">
+          <label htmlFor="onboarding-answers">Taste notes</label>
+          <textarea
+            id="onboarding-answers"
+            rows={4}
+            value={answers}
+            onChange={(e) => setAnswers(e.target.value)}
+          />
+        </div>
         <button className="btn btn-primary" type="submit" disabled={loading}>
-          {loading ? "Finding movies..." : "Find seed movies"}
+          {loading ? "Finding movies…" : "Find seed movies"}
         </button>
       </form>
 
       {error && <p className="error-text">{error}</p>}
+
+      {loading && <SkeletonGrid />}
 
       <div className="rec-grid">
         {results?.map((movie) => (

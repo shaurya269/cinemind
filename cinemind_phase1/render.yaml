@@ -1,0 +1,46 @@
+# Render Blueprint for the CineMind API (Phase 2 backend).
+#
+# Render's free tier is single-service with no persistent volumes and no
+# sibling containers, so this deploys ONLY the FastAPI app -- not Qdrant,
+# Postgres, Redis, or Neo4j. backend/recommender.py, graph.py, and
+# feedback.py already degrade gracefully without them (numpy fallback,
+# SQLite fallback, graph disabled -- see their module docstrings), so the
+# app is fully functional here: recommendations, conversational search,
+# onboarding, and "why this?" explanations all work. Only Redis caching and
+# Neo4j graph insights are unavailable, and the UI already handles that
+# (GET /health's graph_available/recs_cache fields; GraphInsights.jsx shows
+# an error state instead of crashing).
+#
+# data/ and artifacts/ (~22MB) are baked into the image at build time by
+# backend/Dockerfile.render, since there's no volume to bind-mount them at
+# runtime the way backend/docker-compose.yml does locally.
+#
+# Deploy: connect this repo in the Render dashboard as a Blueprint (New +
+# -> Blueprint), or `render blueprint launch` with the Render CLI. Set the
+# secret env vars below in the Render dashboard after the first deploy --
+# they are intentionally left unset here (sync: false) rather than committed.
+services:
+  - type: web
+    name: cinemind-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile.render
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: CORS_ORIGINS
+        value: https://cinemind.vercel.app
+      - key: CINEMIND_ALLOW_MODEL_DOWNLOAD
+        value: "1"
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OMDB_API_KEY
+        sync: false
+      - key: LANGFUSE_PUBLIC_KEY
+        sync: false
+      - key: LANGFUSE_SECRET_KEY
+        sync: false
+      - key: LANGFUSE_HOST
+        value: https://cloud.langfuse.com

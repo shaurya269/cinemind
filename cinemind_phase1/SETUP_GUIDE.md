@@ -407,3 +407,40 @@ caches recommendation responses for 5 minutes when reachable; Neo4j powers
 the "Graph insights" button once loaded (Part 5, Step 8) — both are optional
 and everything works without them, just without the cache speedup / graph
 panel.
+
+### 9.5 Public deployment (Vercel + Render)
+The React frontend and FastAPI backend deploy to separate hosts — Vercel only
+runs static sites/serverless functions, not Docker, so the Qdrant/Postgres/
+Redis/Neo4j stack can't live there. Everything degrades gracefully without
+those four services (see 9.4), so a single Render web service running just
+the API is a fully functional public backend on its own.
+
+**Backend -> Render:**
+1. Push this repo to GitHub (already done — see the top-level `CLAUDE.md`).
+2. In the Render dashboard: New -> Blueprint, point it at this repo. Render
+   reads `render.yaml` and builds `backend/Dockerfile.render`, which bakes
+   `data/` and `artifacts/` (~22MB) into the image since Render's free tier
+   has no volumes to bind-mount them the way `docker-compose.yml` does.
+3. After the first deploy, set whichever of `ANTHROPIC_API_KEY` / `GROQ_API_KEY`
+   / `OMDB_API_KEY` / `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` you want
+   in the Render dashboard (left unset in `render.yaml` on purpose — never
+   commit real keys). Note the service URL, e.g. `https://cinemind-api.onrender.com`.
+4. Update `render.yaml`'s `CORS_ORIGINS` value (and redeploy, or set it as a
+   dashboard env var override) to match your actual Vercel domain once you
+   have it from the step below.
+
+**Frontend -> Vercel:**
+1. In the Vercel dashboard: Add New -> Project, import this repo.
+2. Set the project's **Root Directory** to `frontend` (Vercel builds Vite
+   projects automatically once the root directory is set — no extra build
+   command needed).
+3. Add an environment variable `VITE_API_BASE` = your Render URL from above
+   (see `frontend/.env.example`).
+4. Deploy. `frontend/vercel.json` rewrites all paths to `index.html` so
+   client-side routes (`/app`, `/search`, `/watchlist`, ...) work on refresh
+   and direct link, since this is a single-page React Router app.
+
+Free tiers on both sides: Render's free web service spins down after ~15
+minutes idle and takes a few seconds to wake on the next request (the health
+badge will show "Checking..." briefly); Vercel's free tier has no such
+sleep behavior for static sites.

@@ -1,5 +1,11 @@
-data/
-artifacts/
+# Excluded from the compose build (backend/Dockerfile) since data/ and
+# artifacts/ are bind-mounted at runtime there instead -- but NOT excluded
+# globally, because backend/Dockerfile.render (Render deploy, no volume
+# mounts available) needs to COPY them into the image. Docker has no clean
+# way to scope .dockerignore per-Dockerfile in this repo layout (per-Dockerfile
+# override files are read from the build context root and did not take
+# effect in testing), so the large raw zip is excluded specifically instead.
+data/ml-100k/*.zip
 notebooks/
 System Architecture/
 streamlit_app/
