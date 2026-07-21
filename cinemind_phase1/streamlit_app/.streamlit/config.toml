@@ -1,0 +1,10 @@
+# Matches the React frontend's cinematic dark theme (frontend/src/index.css)
+# so both interfaces share one visual identity: marquee-red accent, warm
+# near-black ground, gold for data/scores.
+[theme]
+base = "dark"
+primaryColor = "#e8493a"
+backgroundColor = "#0b0d10"
+secondaryBackgroundColor = "#171b21"
+textColor = "#ede9e0"
+font = "sans serif"

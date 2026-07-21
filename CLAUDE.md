@@ -256,8 +256,21 @@ portfolio reviewers) without needing to host React + FastAPI + Docker infra.
 streamlit_app/
   app.py                   # Single-page Streamlit app: calls backend/recommender.py,
                             # llm_chains.py, and graph.py directly (no separate API hop)
+  .streamlit/config.toml    # Theme tokens matching frontend/src/index.css (same
+                            # marquee-red accent, near-black ground) -- one visual
+                            # identity across both interfaces
   requirements.txt          # Streamlit-only subset of deps, including redis/neo4j/langfuse
 ```
+Restyled to match the React redesign: custom CSS injected in `app.py` (Bebas
+Neue marquee title, Cascadia-mono gold scores, teal genre chips, styled
+metric cards) on top of `.streamlit/config.toml`'s theme, plus a genre
+filter (`st.multiselect`) on the Returning-user tab and suggestion-chip
+buttons on the Conversational-search tab -- feature parity with the React
+app's GenreFilter/suggestion row where Streamlit's widget model allows it.
+Verified locally via Playwright screenshots against the live artifacts +
+Docker backend (posters, genre chips, "Why this?" explanation, all
+rendering correctly).
+
 Notes:
 - Deploy via Streamlit Community Cloud (free, connects directly to the GitHub repo)
   -- **not done yet**; the app is built and verified locally only.
