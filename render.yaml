@@ -1,5 +1,12 @@
 # Render Blueprint for the CineMind API (Phase 2 backend).
 #
+# IMPORTANT: this file must live at the GIT REPO ROOT (same level as this
+# repo's top-level CLAUDE.md), not inside cinemind_phase1/ -- Render's
+# Blueprint auto-discovery only reads render.yaml from the repo root that
+# it clones. The actual project (backend/, frontend/, etc.) is nested one
+# level down in cinemind_phase1/, which is why dockerfilePath/dockerContext
+# below are prefixed with cinemind_phase1/ instead of being relative to it.
+#
 # Render's free tier is single-service with no persistent volumes and no
 # sibling containers, so this deploys ONLY the FastAPI app -- not Qdrant,
 # Postgres, Redis, or Neo4j. backend/recommender.py, graph.py, and
@@ -12,8 +19,8 @@
 # an error state instead of crashing).
 #
 # data/ and artifacts/ (~22MB) are baked into the image at build time by
-# backend/Dockerfile.render, since there's no volume to bind-mount them at
-# runtime the way backend/docker-compose.yml does locally.
+# cinemind_phase1/backend/Dockerfile.render, since there's no volume to
+# bind-mount them at runtime the way backend/docker-compose.yml does locally.
 #
 # Deploy: connect this repo in the Render dashboard as a Blueprint (New +
 # -> Blueprint), or `render blueprint launch` with the Render CLI. Set the
@@ -23,8 +30,8 @@ services:
   - type: web
     name: cinemind-api
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile.render
-    dockerContext: .
+    dockerfilePath: ./cinemind_phase1/backend/Dockerfile.render
+    dockerContext: ./cinemind_phase1
     plan: free
     healthCheckPath: /health
     envVars:
