@@ -1,0 +1,30 @@
+:root {
+  color-scheme: light dark;
+  font: 15px/1.5 system-ui, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f6f5f1;
+  color: #1b1f27;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #12151c;
+    color: #e9eaef;
+  }
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}

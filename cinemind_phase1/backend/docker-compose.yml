@@ -1,0 +1,74 @@
+# CineMind Phase 2 stack: API + Qdrant + Postgres + Redis.
+#
+# Langfuse is intentionally NOT self-hosted here -- notebooks/06_llm_layer.ipynb
+# and backend/llm_chains.py point at Langfuse Cloud via LANGFUSE_HOST
+# (defaults to https://cloud.langfuse.com), configured through .env instead.
+# Self-hosting Langfuse needs its own Postgres/ClickHouse stack, which is
+# overkill for a portfolio project.
+#
+# Run from the project root:
+#   docker compose -f backend/docker-compose.yml up -d --build
+#
+# IMPORTANT: pass --env-file explicitly (pointing at the project-root .env),
+# not just -f. Compose's automatic .env lookup is tied to how/where the CLI
+# resolves its working directory, which is unreliable across shells (e.g.
+# MSYS/git-bash launching the native docker.exe) -- without --env-file, the
+# ANTHROPIC_API_KEY/GROQ_API_KEY substitutions above can silently resolve to
+# empty strings and the API falls back to retrieval-only silently:
+#   docker compose --env-file "$(pwd)/.env" -f backend/docker-compose.yml up -d --build
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      OMDB_API_KEY: ${OMDB_API_KEY}
+      CINEMIND_ALLOW_MODEL_DOWNLOAD: ${CINEMIND_ALLOW_MODEL_DOWNLOAD:-1}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-https://cloud.langfuse.com}
+      QDRANT_URL: http://qdrant:6333
+      POSTGRES_URL: postgresql://cinemind:cinemind@postgres:5432/cinemind
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ../data:/app/data:ro
+      - ../artifacts:/app/artifacts:ro
+    depends_on:
+      - qdrant
+      - postgres
+      - redis
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cinemind
+      POSTGRES_PASSWORD: cinemind
+      POSTGRES_DB: cinemind
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  qdrant_data:
+  postgres_data:
+  redis_data:

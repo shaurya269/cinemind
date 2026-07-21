@@ -1,0 +1,23 @@
+# CineMind Phase 1 dependencies
+# Install all with:  pip install -r requirements.txt
+
+numpy
+pandas
+matplotlib
+torch
+sentence-transformers
+qdrant-client
+requests               # OMDb enrichment (step 07)
+
+# LLM reasoning layer (notebook 06)
+langchain
+langchain-anthropic
+langchain-groq        # free-tier fallback when ANTHROPIC_API_KEY isn't set
+langfuse
+python-dotenv
+
+# FastAPI backend (Phase 2)
+fastapi
+uvicorn
+psycopg2-binary
+redis

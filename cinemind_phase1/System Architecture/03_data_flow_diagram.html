@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CineMind — Data Flow Diagram</title>
+<style>
+  :root {
+    --ground: #F6F5F1; --surface: #FFFFFF; --surface-2: #FBFAF7;
+    --ink: #1B1F27; --muted: #5B6472; --faint: #8A93A2;
+    --accent: #1E9AA6; --accent-ink: #0E5158;
+    --line: #E3E1D9; --line-strong: #CFCDC3;
+    --offline: #4A6FC0; --offline-bg: #EEF2FB;
+    --online: #B9860F; --online-bg: #FBF3E1;
+    --feedback: #C24E82; --feedback-bg: #FBEAF1;
+    --font-display: "Segoe UI Semibold", "Segoe UI", "Inter", ui-sans-serif, system-ui, sans-serif;
+    --font-body: "Segoe UI", "Inter", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "Cascadia Code", "Consolas", "SFMono-Regular", ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #12151C; --surface: #1A1F29; --surface-2: #1F2530;
+      --ink: #E9EAEF; --muted: #9AA3B5; --faint: #656E80;
+      --accent: #4FD3DE; --accent-ink: #B5F0F4; --line: #2A3140; --line-strong: #384152;
+      --offline: #7C9CE8; --offline-bg: #1B2338;
+      --online: #F0C463; --online-bg: #332810;
+      --feedback: #F08FBB; --feedback-bg: #351E29;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #12151C; --surface: #1A1F29; --surface-2: #1F2530;
+    --ink: #E9EAEF; --muted: #9AA3B5; --faint: #656E80;
+    --accent: #4FD3DE; --accent-ink: #B5F0F4; --line: #2A3140; --line-strong: #384152;
+    --offline: #7C9CE8; --offline-bg: #1B2338; --online: #F0C463; --online-bg: #332810;
+    --feedback: #F08FBB; --feedback-bg: #351E29;
+  }
+  :root[data-theme="light"] {
+    --ground: #F6F5F1; --surface: #FFFFFF; --surface-2: #FBFAF7;
+    --ink: #1B1F27; --muted: #5B6472; --faint: #8A93A2;
+    --accent: #1E9AA6; --accent-ink: #0E5158; --line: #E3E1D9; --line-strong: #CFCDC3;
+    --offline: #4A6FC0; --offline-bg: #EEF2FB; --online: #B9860F; --online-bg: #FBF3E1;
+    --feedback: #C24E82; --feedback-bg: #FBEAF1;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--ground); color: var(--ink); font-family: var(--font-body); line-height: 1.5; padding: 48px 24px 96px; }
+  .page { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+
+  header.doc-head { display: flex; flex-direction: column; gap: 10px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
+  .eyebrow {
+    font-family: var(--font-mono); font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent-ink); background: color-mix(in srgb, var(--accent) 16%, transparent);
+    display: inline-flex; width: fit-content; padding: 4px 10px; border-radius: 4px;
+  }
+  h1 { font-family: var(--font-display); font-size: clamp(26px, 3.4vw, 34px); font-weight: 700; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+  .doc-sub { color: var(--muted); font-size: 15px; max-width: 76ch; }
+
+  .swimlane {
+    background: var(--surface); border: 1px solid var(--line); border-left: 5px solid var(--lane-c);
+    border-radius: 10px; padding: 20px 24px 24px;
+  }
+  .lane-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
+  .lane-tag {
+    font-family: var(--font-mono); font-size: 12px; color: var(--lane-c); background: var(--lane-bg);
+    border-radius: 5px; padding: 2px 7px; font-weight: 700;
+  }
+  .lane-title { font-family: var(--font-display); font-size: 18px; font-weight: 700; }
+  .lane-sub { font-size: 13.5px; color: var(--muted); margin: 4px 0 18px; max-width: 84ch; }
+
+  /* horizontal pipeline of steps */
+  .pipeline {
+    display: flex; align-items: stretch; gap: 0;
+    overflow-x: auto;
+    padding-bottom: 6px;
+  }
+  .pstep {
+    flex: 1 1 190px; min-width: 178px;
+    background: var(--lane-bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 13px; display: flex; flex-direction: column; gap: 5px;
+  }
+  .pstep .pnum { font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--lane-c); }
+  .pstep .pname { font-family: var(--font-mono); font-size: 13px; font-weight: 700; }
+  .pstep .pdesc { font-size: 12px; color: var(--muted); line-height: 1.45; }
+  .parrow {
+    flex: 0 0 30px; display: flex; align-items: center; justify-content: center; color: var(--line-strong);
+  }
+  .parrow svg { display: block; }
+
+  .lane-foot {
+    margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line);
+    font-size: 12.5px; color: var(--muted); display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap;
+  }
+  .lane-foot b { color: var(--ink); font-weight: 600; }
+
+  .connector { display: flex; justify-content: center; margin: -14px 0; }
+  .connector-line { stroke: var(--line-strong); stroke-width: 2; }
+  .connector-arrow { fill: var(--line-strong); }
+
+  /* feedback loop */
+  .loopwrap { position: relative; padding: 6px 0 4px; }
+  .loop-note {
+    display: flex; align-items: center; gap: 10px; justify-content: center;
+    font-family: var(--font-mono); font-size: 12px; color: var(--feedback);
+  }
+  .loop-note svg { flex: none; }
+
+  footer.doc-foot {
+    display: flex; justify-content: space-between; color: var(--faint); font-size: 12px; font-family: var(--font-mono);
+    padding-top: 18px; border-top: 1px solid var(--line); flex-wrap: wrap; gap: 8px;
+  }
+  @media (max-width: 640px) {
+    body { padding: 28px 14px 64px; }
+    .swimlane { padding: 16px 14px 18px; }
+    .pipeline { flex-direction: column; }
+    .parrow { transform: rotate(90deg); margin: -6px 0; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="doc-head">
+    <span class="eyebrow">System Architecture — Diagram 3 of 3</span>
+    <h1>CineMind: Data Flow Diagram</h1>
+    <p class="doc-sub">How a piece of data actually moves through the system: offline batch processing builds the indexes once, an online request path serves each user in real time, and a feedback loop closes the cycle back into retraining.</p>
+  </header>
+
+  <!-- LANE A: OFFLINE -->
+  <section class="swimlane" style="--lane-c: var(--offline); --lane-bg: var(--offline-bg);">
+    <div class="lane-head">
+      <span class="lane-tag">LANE A</span>
+      <span class="lane-title">Offline Batch Flow</span>
+    </div>
+    <p class="lane-sub">Runs once (and again on each retrain) — never on the request path. Produces the vectors that Lane B searches against.</p>
+    <div class="pipeline">
+      <div class="pstep">
+        <span class="pnum">1</span>
+        <span class="pname">MovieLens 100K</span>
+        <span class="pdesc">Raw ratings &amp; item metadata pulled in</span>
+      </div>
+      <div class="parrow"><svg width="26" height="20" viewBox="0 0 26 20"><line x1="0" y1="10" x2="18" y2="10" class="connector-line"/><polygon points="26,10 14,4 14,16" class="connector-arrow"/></svg></div>
+      <div class="pstep">
+        <span class="pnum">2</span>
+        <span class="pname">OMDb title+year match</span>
+        <span class="pdesc">No links.csv in ml-100k — matched by title/year instead of joined; poster/plot/cast</span>
+      </div>
+      <div class="parrow"><svg width="26" height="20" viewBox="0 0 26 20"><line x1="0" y1="10" x2="18" y2="10" class="connector-line"/><polygon points="26,10 14,4 14,16" class="connector-arrow"/></svg></div>
+      <div class="pstep">
+        <span class="pnum">3</span>
+        <span class="pname">PostgreSQL</span>
+        <span class="pdesc">Canonical metadata store</span>
+      </div>
+      <div class="parrow"><svg width="26" height="20" viewBox="0 0 26 20"><line x1="0" y1="10" x2="18" y2="10" class="connector-line"/><polygon points="26,10 14,4 14,16" class="connector-arrow"/></svg></div>
+      <div class="pstep">
+        <span class="pnum">4a</span>
+        <span class="pname">E5-large-v2</span>
+        <span class="pdesc">Content embedding: title+plot+genres+cast+keywords</span>
+      </div>
+      <div class="parrow"><svg width="26" height="20" viewBox="0 0 26 20"><line x1="0" y1="10" x2="18" y2="10" class="connector-line"/><polygon points="26,10 14,4 14,16" class="connector-arrow"/></svg></div>
+      <div class="pstep">
+        <span class="pnum">4b</span>
+        <span class="pname">Two-Tower training</span>
+        <span class="pdesc">Implicit feedback (rating≥4), in-batch negatives + logQ correction, temporal split</span>
+      </div>
+      <div class="parrow"><svg width="26" height="20" viewBox="0 0 26 20"><line x1="0" y1="10" x2="18" y2="10" class="connector-line"/><polygon points="26,10 14,4 14,16" class="connector-arrow"/></svg></div>
+      <div class="pstep">
+        <span class="pnum">5</span>
+        <span class="pname">Qdrant</span>
+        <span class="pdesc">Content vectors + collaborative vectors indexed for ANN</span>
+      </div>
+    </div>
+    <div class="lane-foot">Writes: <b>artifacts/content_vecs.npy · item_vecs.npy · two_tower.pt</b> → loaded into Qdrant collections</div>
+  </section>
+
+  <div class="connector"><svg width="24" height="28" viewBox="0 0 24 28"><line x1="12" y1="0" x2="12" y2="18" class="connector-line"/><polygon points="12,28 4,14 20,14" class="connector-arrow"/></svg></div>
+
+  <!-- LANE B: ONLINE -->
+  <section class="swimlane" style="--lane-c: var(--online); --lane-bg: var(--online-bg);">
+    <div class="lane-head">
+      <span class="lane-tag">LANE B</span>
+      <span class="lane-title">Online Request Flow</span>
+    </div>
+    <p class="lane-sub">Triggered per user request against the FastAPI backend. Reads from what Lane A built; every LLM hop is traced in Langfuse.</p>
+    <div class="pipeline">
+      <div class="pstep">
+        <span class="pnum">1</span>
+        <span class="pname">Client request</span>
+        <span class="pdesc">React (or Streamlit) → GET /recommendations or POST /chat</span>
+      </div>
+      <div class="parrow"><svg width="26" height="20" viewBox="0 0 26 20"><line x1="0" y1="10" x2="18" y2="10" class="connector-line"/><polygon points="26,10 14,4 14,16" class="connector-arrow"/></svg></div>
+      <div class="pstep">
+        <span class="pnum">2</span>
+        <span class="pname">Redis cache check</span>
+        <span class="pdesc">Cache hit → skip to step 6</span>
+      </div>
+      <div class="parrow"><svg width="26" height="20" viewBox="0 0 26 20"><line x1="0" y1="10" x2="18" y2="10" class="connector-line"/><polygon points="26,10 14,4 14,16" class="connector-arrow"/></svg></div>
+      <div class="pstep">
+        <span class="pnum">3</span>
+        <span class="pname">ANN search (Qdrant)</span>
+        <span class="pdesc">Candidate generation → ~200 items, &lt;10ms</span>
+      </div>
+      <div class="parrow"><svg width="26" height="20" viewBox="0 0 26 20"><line x1="0" y1="10" x2="18" y2="10" class="connector-line"/><polygon points="26,10 14,4 14,16" class="connector-arrow"/></svg></div>
+      <div class="pstep">
+        <span class="pnum">4</span>
+        <span class="pname">Ranking</span>
+        <span class="pdesc">MLP scorer / dot product → top 30</span>
+      </div>
+      <div class="parrow"><svg width="26" height="20" viewBox="0 0 26 20"><line x1="0" y1="10" x2="18" y2="10" class="connector-line"/><polygon points="26,10 14,4 14,16" class="connector-arrow"/></svg></div>
+      <div class="pstep">
+        <span class="pnum">5</span>
+        <span class="pname">LLM re-rank + explain</span>
+        <span class="pdesc">LangChain + Claude: top 30 → final 10, grounded "Why this?" per item</span>
+      </div>
+      <div class="parrow"><svg width="26" height="20" viewBox="0 0 26 20"><line x1="0" y1="10" x2="18" y2="10" class="connector-line"/><polygon points="26,10 14,4 14,16" class="connector-arrow"/></svg></div>
+      <div class="pstep">
+        <span class="pnum">6</span>
+        <span class="pname">Response</span>
+        <span class="pdesc">Cached in Redis → returned to client as recommendation cards</span>
+      </div>
+    </div>
+    <div class="lane-foot">Cold-start branch: no user history → <b>POST /onboarding</b> chat replaces step 3–4 with content-vector search on stated preferences</div>
+  </section>
+
+  <div class="loopwrap">
+    <div class="loop-note">
+      <svg width="20" height="20" viewBox="0 0 20 20"><path d="M17 10a7 7 0 1 1-2-4.9" fill="none" stroke="var(--feedback)" stroke-width="2"/><polygon points="17,2 17,8 11,7" fill="var(--feedback)"/></svg>
+      FEEDBACK LOOP — closes back into Lane A
+    </div>
+  </div>
+
+  <!-- LANE C: FEEDBACK -->
+  <section class="swimlane" style="--lane-c: var(--feedback); --lane-bg: var(--feedback-bg);">
+    <div class="lane-head">
+      <span class="lane-tag">LANE C</span>
+      <span class="lane-title">Feedback &amp; Retraining Loop</span>
+    </div>
+    <p class="lane-sub">The only path that writes new implicit-feedback signal back into the system, closing the loop into Lane A's next retrain.</p>
+    <div class="pipeline">
+      <div class="pstep">
+        <span class="pnum">1</span>
+        <span class="pname">Thumbs up/down, clicks</span>
+        <span class="pdesc">Captured in React/Streamlit UI</span>
+      </div>
+      <div class="parrow"><svg width="26" height="20" viewBox="0 0 26 20"><line x1="0" y1="10" x2="18" y2="10" class="connector-line"/><polygon points="26,10 14,4 14,16" class="connector-arrow"/></svg></div>
+      <div class="pstep">
+        <span class="pnum">2</span>
+        <span class="pname">POST /feedback</span>
+        <span class="pdesc">FastAPI route → feedback.py</span>
+      </div>
+      <div class="parrow"><svg width="26" height="20" viewBox="0 0 26 20"><line x1="0" y1="10" x2="18" y2="10" class="connector-line"/><polygon points="26,10 14,4 14,16" class="connector-arrow"/></svg></div>
+      <div class="pstep">
+        <span class="pnum">3</span>
+        <span class="pname">PostgreSQL feedback log</span>
+        <span class="pdesc">Appended alongside historical ratings</span>
+      </div>
+      <div class="parrow"><svg width="26" height="20" viewBox="0 0 26 20"><line x1="0" y1="10" x2="18" y2="10" class="connector-line"/><polygon points="26,10 14,4 14,16" class="connector-arrow"/></svg></div>
+      <div class="pstep">
+        <span class="pnum">4</span>
+        <span class="pname">Next retrain cycle</span>
+        <span class="pdesc">Re-enters Lane A step 1 as new implicit feedback</span>
+      </div>
+    </div>
+    <div class="lane-foot">Every LLM call across all three lanes is traced by <b>Langfuse</b>: cost, latency, prompt version, and — where available — the feedback signal it led to</div>
+  </section>
+
+  <footer class="doc-foot">
+    <span>CineMind — LLM-Augmented Hybrid Recommender</span>
+    <span>Diagram 3/3 · Data Flow</span>
+  </footer>
+
+</div>
+</body>
+</html>

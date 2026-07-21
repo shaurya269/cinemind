@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CineMind — Project Phases</title>
+<style>
+  :root {
+    --ground: #F6F5F1; --surface: #FFFFFF; --surface-2: #FBFAF7;
+    --ink: #1B1F27; --muted: #5B6472; --faint: #8A93A2;
+    --accent: #1E9AA6; --accent-ink: #0E5158;
+    --line: #E3E1D9; --line-strong: #CFCDC3;
+    --l1: #4A6FC0; --l1-bg: #EEF2FB;
+    --l2: #8261CC; --l2-bg: #F3EEFB;
+    --l3: #1F9E88; --l3-bg: #E9F7F3;
+    --l4: #B9860F; --l4-bg: #FBF3E1;
+    --l5: #3F9A46; --l5-bg: #EDF7EC;
+    --l6: #C24E82; --l6-bg: #FBEAF1;
+    --done: #2E9E5B; --done-bg: #E7F6EC;
+    --progress: #B9860F; --progress-bg: #FBF3E1;
+    --todo: #8A93A2; --todo-bg: #EFEEEA;
+    --font-display: "Segoe UI Semibold", "Segoe UI", "Inter", ui-sans-serif, system-ui, sans-serif;
+    --font-body: "Segoe UI", "Inter", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "Cascadia Code", "Consolas", "SFMono-Regular", ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #12151C; --surface: #1A1F29; --surface-2: #1F2530;
+      --ink: #E9EAEF; --muted: #9AA3B5; --faint: #656E80;
+      --accent: #4FD3DE; --accent-ink: #B5F0F4;
+      --line: #2A3140; --line-strong: #384152;
+      --l1: #7C9CE8; --l1-bg: #1B2338; --l2: #B79BF0; --l2-bg: #241D38;
+      --l3: #4FD1B8; --l3-bg: #142E29; --l4: #F0C463; --l4-bg: #332810;
+      --l5: #82D18A; --l5-bg: #17301A; --l6: #F08FBB; --l6-bg: #351E29;
+      --done: #6FCB8F; --done-bg: #17301F; --progress: #F0C463; --progress-bg: #332810;
+      --todo: #7A8497; --todo-bg: #1F2530;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #12151C; --surface: #1A1F29; --surface-2: #1F2530;
+    --ink: #E9EAEF; --muted: #9AA3B5; --faint: #656E80;
+    --accent: #4FD3DE; --accent-ink: #B5F0F4; --line: #2A3140; --line-strong: #384152;
+    --l1: #7C9CE8; --l1-bg: #1B2338; --l2: #B79BF0; --l2-bg: #241D38;
+    --l3: #4FD1B8; --l3-bg: #142E29; --l4: #F0C463; --l4-bg: #332810;
+    --l5: #82D18A; --l5-bg: #17301A; --l6: #F08FBB; --l6-bg: #351E29;
+    --done: #6FCB8F; --done-bg: #17301F; --progress: #F0C463; --progress-bg: #332810;
+    --todo: #7A8497; --todo-bg: #1F2530;
+  }
+  :root[data-theme="light"] {
+    --ground: #F6F5F1; --surface: #FFFFFF; --surface-2: #FBFAF7;
+    --ink: #1B1F27; --muted: #5B6472; --faint: #8A93A2;
+    --accent: #1E9AA6; --accent-ink: #0E5158; --line: #E3E1D9; --line-strong: #CFCDC3;
+    --l1: #4A6FC0; --l1-bg: #EEF2FB; --l2: #8261CC; --l2-bg: #F3EEFB;
+    --l3: #1F9E88; --l3-bg: #E9F7F3; --l4: #B9860F; --l4-bg: #FBF3E1;
+    --l5: #3F9A46; --l5-bg: #EDF7EC; --l6: #C24E82; --l6-bg: #FBEAF1;
+    --done: #2E9E5B; --done-bg: #E7F6EC; --progress: #B9860F; --progress-bg: #FBF3E1;
+    --todo: #8A93A2; --todo-bg: #EFEEEA;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--ground); color: var(--ink); font-family: var(--font-body);
+    line-height: 1.5; padding: 48px 24px 96px;
+  }
+  .page { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+
+  header.doc-head { display: flex; flex-direction: column; gap: 10px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
+  .eyebrow {
+    font-family: var(--font-mono); font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent-ink); background: color-mix(in srgb, var(--accent) 16%, transparent);
+    display: inline-flex; width: fit-content; padding: 4px 10px; border-radius: 4px;
+  }
+  h1 { font-family: var(--font-display); font-size: clamp(26px, 3.4vw, 34px); font-weight: 700; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+  .doc-sub { color: var(--muted); font-size: 15px; max-width: 76ch; }
+
+  .status-legend { display: flex; flex-wrap: wrap; gap: 16px; padding: 14px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; font-size: 13px; color: var(--muted); }
+  .status-legend .pill { margin-right: 6px; }
+
+  .phase {
+    background: var(--surface); border: 1px solid var(--line); border-left: 5px solid var(--layer-c);
+    border-radius: 10px; padding: 20px 24px 24px;
+  }
+  .phase-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 6px; }
+  .phase-title-group { display: flex; align-items: baseline; gap: 10px; }
+  .phase-num { font-family: var(--font-mono); font-size: 12px; color: var(--layer-c); background: var(--layer-bg); border-radius: 5px; padding: 2px 7px; font-weight: 700; }
+  .phase-title { font-family: var(--font-display); font-size: 18px; font-weight: 700; }
+  .phase-dir { font-family: var(--font-mono); font-size: 12.5px; color: var(--faint); }
+  .phase-desc { font-size: 13.5px; color: var(--muted); margin: 4px 0 16px; max-width: 82ch; }
+
+  table.filetable { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.filetable th {
+    text-align: left; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--faint); font-weight: 600; padding: 6px 10px; border-bottom: 1px solid var(--line-strong);
+  }
+  table.filetable td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.filetable tr:last-child td { border-bottom: none; }
+  .fname { font-family: var(--font-mono); font-weight: 700; font-size: 13px; color: var(--ink); white-space: nowrap; }
+  .fdesc { color: var(--muted); }
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 11px;
+    padding: 2px 8px; border-radius: 20px; white-space: nowrap; font-weight: 600;
+  }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; }
+  .pill.done { color: var(--done); background: var(--done-bg); }
+  .pill.done::before { background: var(--done); }
+  .pill.progress { color: var(--progress); background: var(--progress-bg); }
+  .pill.progress::before { background: var(--progress); }
+  .pill.todo { color: var(--todo); background: var(--todo-bg); }
+  .pill.todo::before { background: var(--todo); }
+
+  .layermap { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); font-size: 12px; color: var(--faint); font-family: var(--font-mono); }
+  .layermap b { color: var(--muted); font-family: var(--font-body); font-weight: 600; }
+
+  .connector { display: flex; justify-content: center; margin: -14px 0; }
+  .connector-line { stroke: var(--line-strong); stroke-width: 2; }
+  .connector-arrow { fill: var(--line-strong); }
+
+  .tablewrap { overflow-x: auto; }
+
+  footer.doc-foot {
+    display: flex; justify-content: space-between; color: var(--faint); font-size: 12px; font-family: var(--font-mono);
+    padding-top: 18px; border-top: 1px solid var(--line); flex-wrap: wrap; gap: 8px;
+  }
+  @media (max-width: 640px) {
+    body { padding: 28px 14px 64px; }
+    .phase { padding: 16px 14px 18px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="doc-head">
+    <span class="eyebrow">System Architecture — Diagram 2 of 3</span>
+    <h1>CineMind: Project Phases &amp; Components</h1>
+    <p class="doc-sub">Four build phases, each mapped to real file and notebook names in the repo. Status reflects the actual working tree as of this diagram's generation, not just the plan.</p>
+  </header>
+
+  <div class="status-legend">
+    <span><span class="pill done">done</span>file exists on disk with output artifacts to show for it</span>
+    <span><span class="pill progress">drafted</span>file exists but hasn't been run end-to-end / has no artifacts yet</span>
+    <span><span class="pill todo">planned</span>not yet created</span>
+  </div>
+
+  <!-- PHASE 1 -->
+  <section class="phase" style="--layer-c: var(--l1); --layer-bg: var(--l1-bg);">
+    <div class="phase-head">
+      <div class="phase-title-group">
+        <span class="phase-num">Phase 1</span>
+        <span class="phase-title">Jupyter Prototype</span>
+      </div>
+      <span class="phase-dir">notebooks/  ·  src/  ·  artifacts/</span>
+    </div>
+    <p class="phase-desc">Research and model-development phase. Reproduces the reference repo's RBM baseline, then trains the two-tower model and beats it. Each notebook has a parallel <span class="fname" style="font-size:12px">src/*.py</span> script and, where it has run to completion, writes artifacts into <span class="fname" style="font-size:12px">artifacts/</span>.</p>
+    <div class="tablewrap">
+    <table class="filetable">
+      <tr><th>Notebook</th><th>Purpose</th><th>Produces</th><th>Status</th></tr>
+      <tr>
+        <td class="fname">01_data_exploration.ipynb</td>
+        <td class="fdesc">Load MovieLens + TMDB, EDA, join via links.csv</td>
+        <td class="fdesc">artifacts/eda_overview.png</td>
+        <td><span class="pill done">done</span></td>
+      </tr>
+      <tr>
+        <td class="fname">02_rbm_baseline.ipynb</td>
+        <td class="fdesc">Reproduce reference-repo RBM, measure Precision@10</td>
+        <td class="fdesc">artifacts/results.csv (baseline row)</td>
+        <td><span class="pill done">done</span></td>
+      </tr>
+      <tr>
+        <td class="fname">03_content_embeddings.ipynb</td>
+        <td class="fdesc">E5-large-v2 embeddings → test "movies like X" search</td>
+        <td class="fdesc">artifacts/content_vecs.npy, content_movie_ids.npy</td>
+        <td><span class="pill done">done</span></td>
+      </tr>
+      <tr>
+        <td class="fname">04_two_tower.ipynb</td>
+        <td class="fdesc">Train two-tower model, beat RBM baseline</td>
+        <td class="fdesc">artifacts/two_tower.pt, item_vecs.npy</td>
+        <td><span class="pill done">done</span></td>
+      </tr>
+      <tr>
+        <td class="fname">05_qdrant_indexing.ipynb</td>
+        <td class="fdesc">Load item_vecs.npy into Qdrant, test ANN search</td>
+        <td class="fdesc">Qdrant collection 'collab_vectors' (live, via Docker)</td>
+        <td><span class="pill done">done</span></td>
+      </tr>
+      <tr>
+        <td class="fname">06_llm_layer.ipynb</td>
+        <td class="fdesc">LangChain chains: parse → retrieve → rerank → explain, traced in Langfuse</td>
+        <td class="fdesc">Executed end-to-end via Groq (free tier) — Anthropic optional</td>
+        <td><span class="pill done">done</span></td>
+      </tr>
+      <tr>
+        <td class="fname">07_evaluation.ipynb</td>
+        <td class="fdesc">Compare popularity / RBM / two-tower / hybrid side by side</td>
+        <td class="fdesc">artifacts/results.csv (full comparison)</td>
+        <td><span class="pill done">done</span></td>
+      </tr>
+      <tr>
+        <td class="fname">src/07_omdb_enrichment.py <span class="fdesc" style="font-size:11px">(no notebook mirror — batch script)</span></td>
+        <td class="fdesc">Poster/plot/cast via OMDb, title+year matched (multi-key rotation, resumable)</td>
+        <td class="fdesc">artifacts/movie_meta.csv (1,548/1,682 movies matched)</td>
+        <td><span class="pill done">done</span></td>
+      </tr>
+    </table>
+    </div>
+    <div class="layermap"><b>Feeds architecture layers:</b> L1 Data, L2 Embedding Pipeline</div>
+  </section>
+
+  <div class="connector"><svg width="24" height="28" viewBox="0 0 24 28"><line x1="12" y1="0" x2="12" y2="18" class="connector-line"/><polygon points="12,28 4,14 20,14" class="connector-arrow"/></svg></div>
+
+  <!-- PHASE 2 -->
+  <section class="phase" style="--layer-c: var(--l4); --layer-bg: var(--l4-bg);">
+    <div class="phase-head">
+      <div class="phase-title-group">
+        <span class="phase-num">Phase 2</span>
+        <span class="phase-title">FastAPI Backend</span>
+      </div>
+      <span class="phase-dir">backend/</span>
+    </div>
+    <p class="phase-desc">Wraps the trained model and LLM chains behind a real API, containerised with its stores.</p>
+    <div class="tablewrap">
+    <table class="filetable">
+      <tr><th>File</th><th>Purpose</th><th>Status</th></tr>
+      <tr><td class="fname">main.py</td><td class="fdesc">FastAPI app, all routes</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">recommender.py</td><td class="fdesc">Core pipeline: ANN → rank → LLM</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">embedder.py</td><td class="fdesc">E5 content embedding utility</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">llm_chains.py</td><td class="fdesc">LangChain chains — rerank, explain, onboarding, RAG</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">feedback.py</td><td class="fdesc">Feedback capture → Postgres (SQLite fallback)</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">docker-compose.yml</td><td class="fdesc">API + Qdrant + Postgres + Redis (Langfuse Cloud, not self-hosted)</td><td><span class="pill done">done</span></td></tr>
+    </table>
+    </div>
+    <div class="layermap"><b>Feeds architecture layers:</b> L4 Online Pipeline, L5 Backend</div>
+  </section>
+
+  <div class="connector"><svg width="24" height="28" viewBox="0 0 24 28"><line x1="12" y1="0" x2="12" y2="18" class="connector-line"/><polygon points="12,28 4,14 20,14" class="connector-arrow"/></svg></div>
+
+  <!-- PHASE 3 -->
+  <section class="phase" style="--layer-c: var(--l6); --layer-bg: var(--l6-bg);">
+    <div class="phase-head">
+      <div class="phase-title-group">
+        <span class="phase-num">Phase 3</span>
+        <span class="phase-title">React Frontend</span>
+      </div>
+      <span class="phase-dir">frontend/src/</span>
+    </div>
+    <p class="phase-desc">Consumer-facing client. Talks only to the FastAPI routes from Phase 2 — no direct access to Qdrant/Postgres/Redis.</p>
+    <div class="tablewrap">
+    <table class="filetable">
+      <tr><th>File</th><th>Purpose</th><th>Status</th></tr>
+      <tr><td class="fname">App.jsx</td><td class="fdesc">Root shell: nav, routing, live health badge</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">api.js</td><td class="fdesc">Fetch client for the 5 FastAPI routes (only place the app talks to the backend)</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">components/RecommendationCard.jsx</td><td class="fdesc">Score + genres + "Why this?" expandable panel</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">components/ChatSearch.jsx</td><td class="fdesc">Conversational search input</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">components/OnboardingWizard.jsx</td><td class="fdesc">Cold-start dialogue flow</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">components/ExplainPanel.jsx</td><td class="fdesc">Detailed explanation panel</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">pages/Home.jsx</td><td class="fdesc">Landing / recommendation feed</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">pages/Search.jsx</td><td class="fdesc">Conversational search page</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">pages/Profile.jsx</td><td class="fdesc">User profile &amp; onboarding entry point</td><td><span class="pill done">done</span></td></tr>
+    </table>
+    </div>
+    <div class="layermap"><b>Feeds architecture layers:</b> L6 Frontend</div>
+  </section>
+
+  <div class="connector"><svg width="24" height="28" viewBox="0 0 24 28"><line x1="12" y1="0" x2="12" y2="18" class="connector-line"/><polygon points="12,28 4,14 20,14" class="connector-arrow"/></svg></div>
+
+  <!-- PHASE 3.5 -->
+  <section class="phase" style="--layer-c: var(--l3); --layer-bg: var(--l3-bg);">
+    <div class="phase-head">
+      <div class="phase-title-group">
+        <span class="phase-num">Phase 3.5</span>
+        <span class="phase-title">Streamlit Public Demo</span>
+      </div>
+      <span class="phase-dir">streamlit_app/</span>
+    </div>
+    <p class="phase-desc">Parallel, lightweight deployment track — not a replacement for Phases 2–3. Calls <span class="fname" style="font-size:12px">recommender.py</span> and <span class="fname" style="font-size:12px">llm_chains.py</span> directly (no API hop) so recruiters/reviewers can try the system without Docker infra. Degrades gracefully: Qdrant → in-memory fallback, Postgres → SQLite, Neo4j/Redis skipped.</p>
+    <div class="tablewrap">
+    <table class="filetable">
+      <tr><th>File</th><th>Purpose</th><th>Status</th></tr>
+      <tr><td class="fname">app.py</td><td class="fdesc">Single-page Streamlit app, thin UI wrapper over backend logic</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">requirements.txt</td><td class="fdesc">Streamlit-only dependency subset</td><td><span class="pill done">done</span></td></tr>
+    </table>
+    </div>
+    <div class="layermap"><b>Deploys to:</b> Streamlit Community Cloud · secrets via Streamlit's secrets manager, not .env</div>
+  </section>
+
+  <footer class="doc-foot">
+    <span>CineMind — LLM-Augmented Hybrid Recommender</span>
+    <span>Diagram 2/3 · Project Phases &amp; Components</span>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,11 @@
+streamlit
+numpy
+pandas
+torch
+sentence-transformers
+qdrant-client
+langchain
+langchain-anthropic
+langchain-groq
+python-dotenv
+psycopg2-binary

@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CineMind — System Architecture</title>
+<style>
+  :root {
+    --ground: #F6F5F1;
+    --surface: #FFFFFF;
+    --surface-2: #FBFAF7;
+    --ink: #1B1F27;
+    --muted: #5B6472;
+    --faint: #8A93A2;
+    --accent: #1E9AA6;
+    --accent-ink: #0E5158;
+    --line: #E3E1D9;
+    --line-strong: #CFCDC3;
+
+    --l1: #4A6FC0; --l1-bg: #EEF2FB;
+    --l2: #8261CC; --l2-bg: #F3EEFB;
+    --l3: #1F9E88; --l3-bg: #E9F7F3;
+    --l4: #B9860F; --l4-bg: #FBF3E1;
+    --l5: #3F9A46; --l5-bg: #EDF7EC;
+    --l6: #C24E82; --l6-bg: #FBEAF1;
+
+    --font-display: "Segoe UI Semibold", "Segoe UI", "Inter", ui-sans-serif, system-ui, sans-serif;
+    --font-body: "Segoe UI", "Inter", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "Cascadia Code", "Consolas", "SFMono-Regular", ui-monospace, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #12151C;
+      --surface: #1A1F29;
+      --surface-2: #1F2530;
+      --ink: #E9EAEF;
+      --muted: #9AA3B5;
+      --faint: #656E80;
+      --accent: #4FD3DE;
+      --accent-ink: #B5F0F4;
+      --line: #2A3140;
+      --line-strong: #384152;
+
+      --l1: #7C9CE8; --l1-bg: #1B2338;
+      --l2: #B79BF0; --l2-bg: #241D38;
+      --l3: #4FD1B8; --l3-bg: #142E29;
+      --l4: #F0C463; --l4-bg: #332810;
+      --l5: #82D18A; --l5-bg: #17301A;
+      --l6: #F08FBB; --l6-bg: #351E29;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #12151C; --surface: #1A1F29; --surface-2: #1F2530;
+    --ink: #E9EAEF; --muted: #9AA3B5; --faint: #656E80;
+    --accent: #4FD3DE; --accent-ink: #B5F0F4;
+    --line: #2A3140; --line-strong: #384152;
+    --l1: #7C9CE8; --l1-bg: #1B2338; --l2: #B79BF0; --l2-bg: #241D38;
+    --l3: #4FD1B8; --l3-bg: #142E29; --l4: #F0C463; --l4-bg: #332810;
+    --l5: #82D18A; --l5-bg: #17301A; --l6: #F08FBB; --l6-bg: #351E29;
+  }
+  :root[data-theme="light"] {
+    --ground: #F6F5F1; --surface: #FFFFFF; --surface-2: #FBFAF7;
+    --ink: #1B1F27; --muted: #5B6472; --faint: #8A93A2;
+    --accent: #1E9AA6; --accent-ink: #0E5158;
+    --line: #E3E1D9; --line-strong: #CFCDC3;
+    --l1: #4A6FC0; --l1-bg: #EEF2FB; --l2: #8261CC; --l2-bg: #F3EEFB;
+    --l3: #1F9E88; --l3-bg: #E9F7F3; --l4: #B9860F; --l4-bg: #FBF3E1;
+    --l5: #3F9A46; --l5-bg: #EDF7EC; --l6: #C24E82; --l6-bg: #FBEAF1;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-body);
+    line-height: 1.5;
+    padding: 48px 24px 96px;
+  }
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  /* Header */
+  header.doc-head {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--line);
+  }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    display: inline-flex;
+    width: fit-content;
+    padding: 4px 10px;
+    border-radius: 4px;
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-size: clamp(26px, 3.4vw, 34px);
+    font-weight: 700;
+    margin: 0;
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+  .doc-sub {
+    color: var(--muted);
+    font-size: 15px;
+    max-width: 72ch;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+
+  /* Layer band */
+  .layer {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 5px solid var(--layer-c);
+    border-radius: 10px;
+    padding: 20px 24px 24px;
+  }
+  .layer-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .layer-title-group { display: flex; align-items: baseline; gap: 10px; }
+  .layer-num {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--layer-c);
+    background: var(--layer-bg);
+    border-radius: 5px;
+    padding: 2px 7px;
+    font-weight: 700;
+  }
+  .layer-title { font-family: var(--font-display); font-size: 18px; font-weight: 700; }
+  .layer-role { font-size: 13px; color: var(--muted); }
+
+  .comp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 10px;
+  }
+  .comp {
+    background: var(--layer-bg);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 10px 12px;
+  }
+  .comp-name {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+    display: block;
+    margin-bottom: 3px;
+  }
+  .comp-desc { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+
+  /* sub-steps within a layer (ordered pipeline) */
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    counter-reset: step;
+  }
+  .step {
+    display: grid;
+    grid-template-columns: 26px 1fr;
+    gap: 10px;
+    align-items: start;
+    background: var(--layer-bg);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 9px 12px;
+  }
+  .step-idx {
+    counter-increment: step;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--layer-c);
+  }
+  .step-idx::before { content: counter(step); }
+  .step-body .comp-name { margin-bottom: 2px; }
+
+  /* connector between bands */
+  .connector {
+    display: flex;
+    justify-content: center;
+    margin: -14px 0;
+  }
+  .connector svg { display: block; }
+  .connector-line { stroke: var(--line-strong); stroke-width: 2; }
+  .connector-arrow { fill: var(--line-strong); }
+
+  /* stack tags row */
+  .stackrow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--line);
+  }
+  .tag {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 3px 10px;
+  }
+
+  footer.doc-foot {
+    display: flex;
+    justify-content: space-between;
+    color: var(--faint);
+    font-size: 12px;
+    font-family: var(--font-mono);
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 28px 14px 64px; }
+    .layer { padding: 16px 14px 18px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="doc-head">
+    <span class="eyebrow">System Architecture — Diagram 1 of 3</span>
+    <h1>CineMind: Complete System Architecture</h1>
+    <p class="doc-sub">Six-layer architecture for the LLM-augmented hybrid deep learning recommender — from raw data ingestion through to the React client. Each band below is one architectural layer; arrows show the primary direction of data and control flow.</p>
+  </header>
+
+  <div class="legend">
+    <div class="legend-item"><span class="legend-dot" style="background:var(--l1)"></span>L1 · Data</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--l2)"></span>L2 · Embedding Pipeline</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--l3)"></span>L3 · Storage</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--l4)"></span>L4 · Online Pipeline</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--l5)"></span>L5 · Backend (FastAPI)</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--l6)"></span>L6 · Frontend (React)</div>
+  </div>
+
+  <!-- LAYER 1 -->
+  <section class="layer" style="--layer-c: var(--l1); --layer-bg: var(--l1-bg);">
+    <div class="layer-head">
+      <div class="layer-title-group">
+        <span class="layer-num">L1</span>
+        <span class="layer-title">Data</span>
+      </div>
+      <span class="layer-role">Raw sources, joined and normalised into relational storage</span>
+    </div>
+    <div class="comp-grid">
+      <div class="comp"><span class="comp-name">MovieLens 100K</span><span class="comp-desc">User ratings, timestamps — source of implicit feedback (rating ≥ 4)</span></div>
+      <div class="comp"><span class="comp-name">OMDb API</span><span class="comp-desc">Plot, cast, posters — matched by title+year (ml-100k ships no links.csv/tmdbId), multi-key rotation for quota</span></div>
+      <div class="comp"><span class="comp-name">PostgreSQL</span><span class="comp-desc">Clean, joined metadata land here before downstream processing</span></div>
+    </div>
+  </section>
+
+  <div class="connector"><svg width="24" height="28" viewBox="0 0 24 28"><line x1="12" y1="0" x2="12" y2="18" class="connector-line"/><polygon points="12,28 4,14 20,14" class="connector-arrow"/></svg></div>
+
+  <!-- LAYER 2 -->
+  <section class="layer" style="--layer-c: var(--l2); --layer-bg: var(--l2-bg);">
+    <div class="layer-head">
+      <div class="layer-title-group">
+        <span class="layer-num">L2</span>
+        <span class="layer-title">Embedding Pipeline</span>
+      </div>
+      <span class="layer-role">Offline, batch — runs once (or on retrain), not per-request</span>
+    </div>
+    <div class="comp-grid">
+      <div class="comp"><span class="comp-name">Content embeddings</span><span class="comp-desc">intfloat/E5-large-v2 (local) over title + plot + genres + cast + keywords</span></div>
+      <div class="comp"><span class="comp-name">Collaborative embeddings</span><span class="comp-desc">Two-tower PyTorch model trained on implicit feedback; 64-dim towers</span></div>
+    </div>
+    <div class="stackrow">
+      <span class="tag">torch</span><span class="tag">sentence-transformers</span><span class="tag">in-batch negatives</span><span class="tag">logQ correction</span><span class="tag">temporal split</span>
+    </div>
+  </section>
+
+  <div class="connector"><svg width="24" height="28" viewBox="0 0 24 28"><line x1="12" y1="0" x2="12" y2="18" class="connector-line"/><polygon points="12,28 4,14 20,14" class="connector-arrow"/></svg></div>
+
+  <!-- LAYER 3 -->
+  <section class="layer" style="--layer-c: var(--l3); --layer-bg: var(--l3-bg);">
+    <div class="layer-head">
+      <div class="layer-title-group">
+        <span class="layer-num">L3</span>
+        <span class="layer-title">Storage</span>
+      </div>
+      <span class="layer-role">Four purpose-built stores, each serving a different access pattern</span>
+    </div>
+    <div class="comp-grid">
+      <div class="comp"><span class="comp-name">Qdrant</span><span class="comp-desc">Vector search — separate collections for content vectors &amp; collaborative vectors</span></div>
+      <div class="comp"><span class="comp-name">Neo4j <em style="font-style:normal;color:var(--faint)">(later phase)</em></span><span class="comp-desc">Graph: user → rated → movie → directed_by → person → directed → movie</span></div>
+      <div class="comp"><span class="comp-name">Redis</span><span class="comp-desc">Cached recommendations, session state</span></div>
+      <div class="comp"><span class="comp-name">PostgreSQL</span><span class="comp-desc">Clean metadata, user profiles, feedback logs</span></div>
+    </div>
+  </section>
+
+  <div class="connector"><svg width="24" height="28" viewBox="0 0 24 28"><line x1="12" y1="0" x2="12" y2="18" class="connector-line"/><polygon points="12,28 4,14 20,14" class="connector-arrow"/></svg></div>
+
+  <!-- LAYER 4 -->
+  <section class="layer" style="--layer-c: var(--l4); --layer-bg: var(--l4-bg);">
+    <div class="layer-head">
+      <div class="layer-title-group">
+        <span class="layer-num">L4</span>
+        <span class="layer-title">Online Pipeline</span>
+      </div>
+      <span class="layer-role">Executes per request — Langfuse traces every LLM call in this layer</span>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <span class="step-idx"></span>
+        <div class="step-body">
+          <span class="comp-name">Candidate generation</span>
+          <span class="comp-desc">ANN search in Qdrant → ~200 candidates, &lt; 10 ms</span>
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-idx"></span>
+        <div class="step-body">
+          <span class="comp-name">Ranking</span>
+          <span class="comp-desc">MLP scorer or dot product → top 30</span>
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-idx"></span>
+        <div class="step-body">
+          <span class="comp-name">LLM reasoning (LangChain)</span>
+          <span class="comp-desc">(a) conversational query parsing — RAG · (b) re-rank top 30 → final 10 · (c) grounded "Why this?" explanation · (d) cold-start onboarding chat</span>
+        </div>
+      </div>
+    </div>
+    <div class="stackrow">
+      <span class="tag">LangChain LCEL</span><span class="tag">Claude Haiku / Sonnet</span><span class="tag">Langfuse traces</span>
+    </div>
+  </section>
+
+  <div class="connector"><svg width="24" height="28" viewBox="0 0 24 28"><line x1="12" y1="0" x2="12" y2="18" class="connector-line"/><polygon points="12,28 4,14 20,14" class="connector-arrow"/></svg></div>
+
+  <!-- LAYER 5 -->
+  <section class="layer" style="--layer-c: var(--l5); --layer-bg: var(--l5-bg);">
+    <div class="layer-head">
+      <div class="layer-title-group">
+        <span class="layer-num">L5</span>
+        <span class="layer-title">Backend</span>
+      </div>
+      <span class="layer-role">FastAPI — orchestrates L1–L4, exposed via 5 routes, containerised alongside its stores</span>
+    </div>
+    <div class="comp-grid">
+      <div class="comp"><span class="comp-name">GET /recommendations/{user_id}</span><span class="comp-desc">Full pipeline: ANN → rank → LLM re-rank</span></div>
+      <div class="comp"><span class="comp-name">POST /chat</span><span class="comp-desc">Conversational search (RAG over Qdrant)</span></div>
+      <div class="comp"><span class="comp-name">POST /onboarding</span><span class="comp-desc">Cold-start dialogue for new users</span></div>
+      <div class="comp"><span class="comp-name">POST /feedback</span><span class="comp-desc">Clicks / ratings → Postgres → retraining</span></div>
+      <div class="comp"><span class="comp-name">GET /explain/{movie_id}</span><span class="comp-desc">Detailed, metadata-grounded explanation</span></div>
+    </div>
+    <div class="stackrow">
+      <span class="tag">docker-compose: API + Qdrant + Postgres + Redis</span>
+    </div>
+  </section>
+
+  <div class="connector"><svg width="24" height="28" viewBox="0 0 24 28"><line x1="12" y1="0" x2="12" y2="18" class="connector-line"/><polygon points="12,28 4,14 20,14" class="connector-arrow"/></svg></div>
+
+  <!-- LAYER 6 -->
+  <section class="layer" style="--layer-c: var(--l6); --layer-bg: var(--l6-bg);">
+    <div class="layer-head">
+      <div class="layer-title-group">
+        <span class="layer-num">L6</span>
+        <span class="layer-title">Frontend</span>
+      </div>
+      <span class="layer-role">React — consumes the FastAPI routes above; a parallel Streamlit demo bypasses this layer for public access</span>
+    </div>
+    <div class="comp-grid">
+      <div class="comp"><span class="comp-name">Recommendation cards</span><span class="comp-desc">Poster + score + expandable "Why this?" panel</span></div>
+      <div class="comp"><span class="comp-name">Chat interface</span><span class="comp-desc">LLM dialogue for conversational search</span></div>
+      <div class="comp"><span class="comp-name">Onboarding wizard</span><span class="comp-desc">Cold-start flow for new users</span></div>
+      <div class="comp"><span class="comp-name">Thumbs up / down</span><span class="comp-desc">Feedback capture → POST /feedback</span></div>
+    </div>
+  </section>
+
+  <footer class="doc-foot">
+    <span>CineMind — LLM-Augmented Hybrid Recommender</span>
+    <span>Diagram 1/3 · System Architecture</span>
+  </footer>
+
+</div>
+</body>
+</html>
