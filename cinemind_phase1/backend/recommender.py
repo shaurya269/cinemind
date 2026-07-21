@@ -19,6 +19,7 @@ is no fallback for missing artifacts themselves -- those must exist (run the
 Phase 1 pipeline first).
 """
 
+import json
 import os
 import sys
 import importlib.util
@@ -60,6 +61,8 @@ model = None
 _use_qdrant = False
 _qdrant_client = None
 enrich_of = {}   # movie_id -> {poster_url, overview, cast}, optional (step 07, OMDb)
+_redis_client = None   # optional cache for recommend_for_user, None if unreachable
+RECS_CACHE_TTL_SECONDS = 300
 
 
 def _import_two_tower_module():
@@ -78,6 +81,7 @@ def load():
     safe to call from FastAPI's startup event and again from a notebook."""
     global _loaded, items, title_of, genres_of, seen, top_pop, log_pop
     global item_vecs, content_vecs, content_ids, model, _use_qdrant, _qdrant_client, enrich_of
+    global _redis_client
 
     if _loaded:
         return
@@ -163,6 +167,16 @@ def load():
     else:
         enrich_of = {}
 
+    # Optional: Redis cache for recommend_for_user (numpy/no-cache fallback
+    # otherwise) -- same auto-detect pattern as Qdrant above.
+    try:
+        import redis
+        redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379")
+        _redis_client = redis.from_url(redis_url, socket_connect_timeout=3, socket_timeout=3)
+        _redis_client.ping()
+    except Exception:
+        _redis_client = None
+
     _loaded = True
 
 
@@ -193,9 +207,26 @@ def _movie_payload(movie_id: int, score: float = None):
 
 def recommend_for_user(user_id: int, k: int = 10, alpha: float = 0.30):
     """Returning-user path: two-tower similarity + a small popularity prior
-    (the hybrid ranker that beat both pure approaches in notebook 04/07)."""
+    (the hybrid ranker that beat both pure approaches in notebook 04/07).
+
+    Cache-aside via Redis when available: repeat requests for the same
+    (user_id, k) skip model inference entirely until the TTL expires. A
+    short TTL (not "forever") matters here because POST /feedback changes
+    the `seen` set, which should be reflected reasonably soon, not cached
+    permanently stale.
+    """
     if not _loaded:
         load()
+
+    cache_key = f"recs:{user_id}:{k}"
+    if _redis_client is not None:
+        try:
+            cached = _redis_client.get(cache_key)
+            if cached is not None:
+                return json.loads(cached)
+        except Exception:
+            pass   # cache read failure should never break a real request
+
     k = max(1, min(k, len(title_of)))
     with torch.no_grad():
         uv = model.user_vec(torch.tensor([user_id]))
@@ -204,10 +235,18 @@ def recommend_for_user(user_id: int, k: int = 10, alpha: float = 0.30):
         scores[m] = -1e9
     top_idx = np.argpartition(-scores, k)[:k]
     top_idx = top_idx[np.argsort(-scores[top_idx])]
-    return [
+    results = [
         _movie_payload(m, scores[m])
         for m in top_idx if int(m) in title_of
     ]
+
+    if _redis_client is not None:
+        try:
+            _redis_client.setex(cache_key, RECS_CACHE_TTL_SECONDS, json.dumps(results))
+        except Exception:
+            pass
+
+    return results
 
 
 def retrieve_candidates(query: str, k: int = 30):

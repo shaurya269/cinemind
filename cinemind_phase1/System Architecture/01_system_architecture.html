@@ -323,10 +323,10 @@
       <span class="layer-role">Four purpose-built stores, each serving a different access pattern</span>
     </div>
     <div class="comp-grid">
-      <div class="comp"><span class="comp-name">Qdrant</span><span class="comp-desc">Vector search — separate collections for content vectors &amp; collaborative vectors</span></div>
-      <div class="comp"><span class="comp-name">Neo4j <em style="font-style:normal;color:var(--faint)">(later phase)</em></span><span class="comp-desc">Graph: user → rated → movie → directed_by → person → directed → movie</span></div>
-      <div class="comp"><span class="comp-name">Redis</span><span class="comp-desc">Cached recommendations, session state</span></div>
-      <div class="comp"><span class="comp-name">PostgreSQL</span><span class="comp-desc">Clean metadata, user profiles, feedback logs</span></div>
+      <div class="comp"><span class="comp-name">Qdrant</span><span class="comp-desc">Vector search — collaborative vectors (content vectors searched via plain cosine in recommender.py)</span></div>
+      <div class="comp"><span class="comp-name">Neo4j</span><span class="comp-desc">Graph: user → rated → movie → has_genre → genre. Queried for co-rater &amp; shared-genre insights (GET /graph/insights)</span></div>
+      <div class="comp"><span class="comp-name">Redis</span><span class="comp-desc">Cache-aside for GET /recommendations, 5 min TTL</span></div>
+      <div class="comp"><span class="comp-name">PostgreSQL</span><span class="comp-desc">Feedback logs (SQLite fallback)</span></div>
     </div>
   </section>
 
@@ -346,26 +346,33 @@
         <span class="step-idx"></span>
         <div class="step-body">
           <span class="comp-name">Candidate generation</span>
-          <span class="comp-desc">ANN search in Qdrant → ~200 candidates, &lt; 10 ms</span>
+          <span class="comp-desc">Cosine search over content vectors → ~30 candidates</span>
         </div>
       </div>
       <div class="step">
         <span class="step-idx"></span>
         <div class="step-body">
           <span class="comp-name">Ranking</span>
-          <span class="comp-desc">MLP scorer or dot product → top 30</span>
+          <span class="comp-desc">Two-tower dot product + 0.30 × log-popularity prior, Redis-cached 5 min</span>
         </div>
       </div>
       <div class="step">
         <span class="step-idx"></span>
         <div class="step-body">
           <span class="comp-name">LLM reasoning (LangChain)</span>
-          <span class="comp-desc">(a) conversational query parsing — RAG · (b) re-rank top 30 → final 10 · (c) grounded "Why this?" explanation · (d) cold-start onboarding chat</span>
+          <span class="comp-desc">(a) conversational query parsing — RAG · (b) re-rank top ~30 → final 10 · (c) grounded "Why this?" explanation · (d) cold-start onboarding chat</span>
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-idx"></span>
+        <div class="step-body">
+          <span class="comp-name">Graph insights</span>
+          <span class="comp-desc">Neo4j traversal: co-raters &amp; shared-genre movies, independent of the ranking/LLM steps above</span>
         </div>
       </div>
     </div>
     <div class="stackrow">
-      <span class="tag">LangChain LCEL</span><span class="tag">Claude Haiku / Sonnet</span><span class="tag">Langfuse traces</span>
+      <span class="tag">LangChain LCEL</span><span class="tag">Claude Haiku / Sonnet or Groq</span><span class="tag">Langfuse traces</span>
     </div>
   </section>
 
@@ -378,17 +385,19 @@
         <span class="layer-num">L5</span>
         <span class="layer-title">Backend</span>
       </div>
-      <span class="layer-role">FastAPI — orchestrates L1–L4, exposed via 5 routes, containerised alongside its stores</span>
+      <span class="layer-role">FastAPI — orchestrates L1–L4, exposed via 7 routes, containerised alongside its stores</span>
     </div>
     <div class="comp-grid">
-      <div class="comp"><span class="comp-name">GET /recommendations/{user_id}</span><span class="comp-desc">Full pipeline: ANN → rank → LLM re-rank</span></div>
-      <div class="comp"><span class="comp-name">POST /chat</span><span class="comp-desc">Conversational search (RAG over Qdrant)</span></div>
+      <div class="comp"><span class="comp-name">GET /recommendations/{user_id}</span><span class="comp-desc">Full pipeline: candidate gen → rank (Redis-cached) → LLM re-rank</span></div>
+      <div class="comp"><span class="comp-name">POST /chat</span><span class="comp-desc">Conversational search (RAG over content vectors)</span></div>
       <div class="comp"><span class="comp-name">POST /onboarding</span><span class="comp-desc">Cold-start dialogue for new users</span></div>
       <div class="comp"><span class="comp-name">POST /feedback</span><span class="comp-desc">Clicks / ratings → Postgres → retraining</span></div>
       <div class="comp"><span class="comp-name">GET /explain/{movie_id}</span><span class="comp-desc">Detailed, metadata-grounded explanation</span></div>
+      <div class="comp"><span class="comp-name">GET /graph/insights/{movie_id}</span><span class="comp-desc">Co-raters &amp; shared-genre movies via Neo4j</span></div>
+      <div class="comp"><span class="comp-name">GET /health</span><span class="comp-desc">LLM provider, feedback backend, cache, graph status</span></div>
     </div>
     <div class="stackrow">
-      <span class="tag">docker-compose: API + Qdrant + Postgres + Redis</span>
+      <span class="tag">docker-compose: API + Qdrant + Postgres + Redis + Neo4j</span>
     </div>
   </section>
 
@@ -405,6 +414,7 @@
     </div>
     <div class="comp-grid">
       <div class="comp"><span class="comp-name">Recommendation cards</span><span class="comp-desc">Poster + score + expandable "Why this?" panel</span></div>
+      <div class="comp"><span class="comp-name">Graph insights panel</span><span class="comp-desc">Co-raters &amp; shared-genre movies via GET /graph/insights</span></div>
       <div class="comp"><span class="comp-name">Chat interface</span><span class="comp-desc">LLM dialogue for conversational search</span></div>
       <div class="comp"><span class="comp-name">Onboarding wizard</span><span class="comp-desc">Cold-start flow for new users</span></div>
       <div class="comp"><span class="comp-name">Thumbs up / down</span><span class="comp-desc">Feedback capture → POST /feedback</span></div>

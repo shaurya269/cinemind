@@ -20,6 +20,12 @@ PROVIDER SELECTION -- checked in this order, first one with a key wins:
 This means the exact same chains below run on whichever provider is
 configured, with no other code changes needed -- set ANTHROPIC_API_KEY later
 and it takes over automatically.
+
+TRACING -- every chain invocation goes through _invoke_or_none(), which
+attaches a Langfuse CallbackHandler when LANGFUSE_PUBLIC_KEY/SECRET_KEY are
+set (cost, latency, inputs/outputs, visible at LANGFUSE_HOST's dashboard).
+Traces nothing and costs nothing extra when unset -- same degrade-silently
+pattern as the LLM provider selection above.
 """
 
 import os
@@ -87,6 +93,17 @@ if LLM_PROVIDER is None and os.environ.get("GROQ_API_KEY"):
 
 LLM_AVAILABLE = LLM_PROVIDER is not None
 
+LANGFUSE_AVAILABLE = False
+_langfuse_callbacks = []
+
+if os.environ.get("LANGFUSE_PUBLIC_KEY") and os.environ.get("LANGFUSE_SECRET_KEY"):
+    try:
+        from langfuse.langchain import CallbackHandler
+        _langfuse_callbacks = [CallbackHandler()]
+        LANGFUSE_AVAILABLE = True
+    except ImportError:
+        pass
+
 parse_query_chain = None
 rerank_chain = None
 explain_chain = None
@@ -150,9 +167,11 @@ if LLM_AVAILABLE:
 
 def _invoke_or_none(chain, payload):
     """Run an optional LLM chain. Network/API failures should degrade the
-    app to retrieval-only behavior instead of breaking recommendations."""
+    app to retrieval-only behavior instead of breaking recommendations.
+    Every invocation is traced to Langfuse when configured (see module
+    docstring) -- this is the one place that needs to know about it."""
     try:
-        return chain.invoke(payload)
+        return chain.invoke(payload, config={"callbacks": _langfuse_callbacks})
     except Exception:
         return None
 

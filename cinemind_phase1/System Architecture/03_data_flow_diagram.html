@@ -197,29 +197,29 @@
       <div class="parrow"><svg width="26" height="20" viewBox="0 0 26 20"><line x1="0" y1="10" x2="18" y2="10" class="connector-line"/><polygon points="26,10 14,4 14,16" class="connector-arrow"/></svg></div>
       <div class="pstep">
         <span class="pnum">3</span>
-        <span class="pname">ANN search (Qdrant)</span>
-        <span class="pdesc">Candidate generation → ~200 items, &lt;10ms</span>
+        <span class="pname">Candidate generation</span>
+        <span class="pdesc">Cosine search over content vectors → ~30 items</span>
       </div>
       <div class="parrow"><svg width="26" height="20" viewBox="0 0 26 20"><line x1="0" y1="10" x2="18" y2="10" class="connector-line"/><polygon points="26,10 14,4 14,16" class="connector-arrow"/></svg></div>
       <div class="pstep">
         <span class="pnum">4</span>
         <span class="pname">Ranking</span>
-        <span class="pdesc">MLP scorer / dot product → top 30</span>
+        <span class="pdesc">Two-tower dot product + 0.30 × log-popularity prior</span>
       </div>
       <div class="parrow"><svg width="26" height="20" viewBox="0 0 26 20"><line x1="0" y1="10" x2="18" y2="10" class="connector-line"/><polygon points="26,10 14,4 14,16" class="connector-arrow"/></svg></div>
       <div class="pstep">
         <span class="pnum">5</span>
         <span class="pname">LLM re-rank + explain</span>
-        <span class="pdesc">LangChain + Claude: top 30 → final 10, grounded "Why this?" per item</span>
+        <span class="pdesc">LangChain + Claude/Groq: top ~30 → final 10, grounded "Why this?" per item</span>
       </div>
       <div class="parrow"><svg width="26" height="20" viewBox="0 0 26 20"><line x1="0" y1="10" x2="18" y2="10" class="connector-line"/><polygon points="26,10 14,4 14,16" class="connector-arrow"/></svg></div>
       <div class="pstep">
         <span class="pnum">6</span>
         <span class="pname">Response</span>
-        <span class="pdesc">Cached in Redis → returned to client as recommendation cards</span>
+        <span class="pdesc">Cached in Redis (5 min TTL) → returned to client as recommendation cards</span>
       </div>
     </div>
-    <div class="lane-foot">Cold-start branch: no user history → <b>POST /onboarding</b> chat replaces step 3–4 with content-vector search on stated preferences</div>
+    <div class="lane-foot">Cold-start branch: no user history → <b>POST /onboarding</b> chat replaces step 3–4 with content-vector search on stated preferences. Independent branch: <b>GET /graph/insights/{movie_id}</b> queries Neo4j directly (co-raters, shared-genre movies) — not part of this numbered pipeline, triggered on demand by a "Graph insights" button per card.</div>
   </section>
 
   <div class="loopwrap">

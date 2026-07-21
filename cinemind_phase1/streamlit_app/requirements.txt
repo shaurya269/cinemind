@@ -9,3 +9,6 @@ langchain-anthropic
 langchain-groq
 python-dotenv
 psycopg2-binary
+redis
+neo4j
+langfuse

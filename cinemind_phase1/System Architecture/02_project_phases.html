@@ -204,6 +204,12 @@
         <td class="fdesc">artifacts/movie_meta.csv (1,548/1,682 movies matched)</td>
         <td><span class="pill done">done</span></td>
       </tr>
+      <tr>
+        <td class="fname">src/08_neo4j_graph.py <span class="fdesc" style="font-size:11px">(no notebook mirror — batch script)</span></td>
+        <td class="fdesc">Loads User-RATED->Movie, Movie-HAS_GENRE->Genre into Neo4j (idempotent, batched)</td>
+        <td class="fdesc">Neo4j graph: 942 User, 1,682 Movie nodes; 55,375 RATED, 2,893 HAS_GENRE edges</td>
+        <td><span class="pill done">done</span></td>
+      </tr>
     </table>
     </div>
     <div class="layermap"><b>Feeds architecture layers:</b> L1 Data, L2 Embedding Pipeline</div>
@@ -224,12 +230,13 @@
     <div class="tablewrap">
     <table class="filetable">
       <tr><th>File</th><th>Purpose</th><th>Status</th></tr>
-      <tr><td class="fname">main.py</td><td class="fdesc">FastAPI app, all routes</td><td><span class="pill done">done</span></td></tr>
-      <tr><td class="fname">recommender.py</td><td class="fdesc">Core pipeline: ANN → rank → LLM</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">main.py</td><td class="fdesc">FastAPI app, all 7 routes</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">recommender.py</td><td class="fdesc">Core pipeline: ANN → rank → LLM; Redis cache-aside (5 min TTL, verified ~24x speedup)</td><td><span class="pill done">done</span></td></tr>
       <tr><td class="fname">embedder.py</td><td class="fdesc">E5 content embedding utility</td><td><span class="pill done">done</span></td></tr>
-      <tr><td class="fname">llm_chains.py</td><td class="fdesc">LangChain chains — rerank, explain, onboarding, RAG</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">llm_chains.py</td><td class="fdesc">LangChain chains — rerank, explain, onboarding, RAG; Langfuse-traced (verified trace delivery)</td><td><span class="pill done">done</span></td></tr>
       <tr><td class="fname">feedback.py</td><td class="fdesc">Feedback capture → Postgres (SQLite fallback)</td><td><span class="pill done">done</span></td></tr>
-      <tr><td class="fname">docker-compose.yml</td><td class="fdesc">API + Qdrant + Postgres + Redis (Langfuse Cloud, not self-hosted)</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">graph.py</td><td class="fdesc">Neo4j queries — graph_insights() for GET /graph/insights</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">docker-compose.yml</td><td class="fdesc">API + Qdrant + Postgres + Redis + Neo4j (Langfuse Cloud, not self-hosted)</td><td><span class="pill done">done</span></td></tr>
     </table>
     </div>
     <div class="layermap"><b>Feeds architecture layers:</b> L4 Online Pipeline, L5 Backend</div>
@@ -246,16 +253,17 @@
       </div>
       <span class="phase-dir">frontend/src/</span>
     </div>
-    <p class="phase-desc">Consumer-facing client. Talks only to the FastAPI routes from Phase 2 — no direct access to Qdrant/Postgres/Redis.</p>
+    <p class="phase-desc">Consumer-facing client. Talks only to the FastAPI routes from Phase 2 — no direct access to Qdrant/Postgres/Redis/Neo4j.</p>
     <div class="tablewrap">
     <table class="filetable">
       <tr><th>File</th><th>Purpose</th><th>Status</th></tr>
       <tr><td class="fname">App.jsx</td><td class="fdesc">Root shell: nav, routing, live health badge</td><td><span class="pill done">done</span></td></tr>
-      <tr><td class="fname">api.js</td><td class="fdesc">Fetch client for the 5 FastAPI routes (only place the app talks to the backend)</td><td><span class="pill done">done</span></td></tr>
-      <tr><td class="fname">components/RecommendationCard.jsx</td><td class="fdesc">Score + genres + "Why this?" expandable panel</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">api.js</td><td class="fdesc">Fetch client for all FastAPI routes (only place the app talks to the backend)</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">components/RecommendationCard.jsx</td><td class="fdesc">Score + genres + "Why this?" + Graph insights panels</td><td><span class="pill done">done</span></td></tr>
       <tr><td class="fname">components/ChatSearch.jsx</td><td class="fdesc">Conversational search input</td><td><span class="pill done">done</span></td></tr>
       <tr><td class="fname">components/OnboardingWizard.jsx</td><td class="fdesc">Cold-start dialogue flow</td><td><span class="pill done">done</span></td></tr>
       <tr><td class="fname">components/ExplainPanel.jsx</td><td class="fdesc">Detailed explanation panel</td><td><span class="pill done">done</span></td></tr>
+      <tr><td class="fname">components/GraphInsights.jsx</td><td class="fdesc">Co-raters &amp; shared-genre movies via Neo4j</td><td><span class="pill done">done</span></td></tr>
       <tr><td class="fname">pages/Home.jsx</td><td class="fdesc">Landing / recommendation feed</td><td><span class="pill done">done</span></td></tr>
       <tr><td class="fname">pages/Search.jsx</td><td class="fdesc">Conversational search page</td><td><span class="pill done">done</span></td></tr>
       <tr><td class="fname">pages/Profile.jsx</td><td class="fdesc">User profile &amp; onboarding entry point</td><td><span class="pill done">done</span></td></tr>

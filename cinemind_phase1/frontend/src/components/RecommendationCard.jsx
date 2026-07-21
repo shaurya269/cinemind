@@ -1,5 +1,6 @@
 import { parseGenres, sendFeedback } from "../api";
 import ExplainPanel from "./ExplainPanel";
+import GraphInsights from "./GraphInsights";
 
 export default function RecommendationCard({ movie, query, userId, onFeedback }) {
   const genres = parseGenres(movie.genres);
@@ -55,6 +56,7 @@ export default function RecommendationCard({ movie, query, userId, onFeedback })
 
       <footer className="rec-card-actions">
         <ExplainPanel movieId={movie.movie_id} query={query} />
+        <GraphInsights movieId={movie.movie_id} />
         {userId && (
           <span className="feedback-buttons">
             <button className="btn btn-ghost" onClick={() => handleFeedback(true)}>

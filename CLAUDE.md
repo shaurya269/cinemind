@@ -43,12 +43,12 @@ https://github.com/nshakhapur/Movie_Recommendation_DeepLearning
 | Deep learning model | PyTorch (two-tower neural network) |
 | Content embeddings | intfloat/e5-small-v2 (local, free — small chosen deliberately for laptop speed; see nested `cinemind_phase1/CLAUDE.md`) |
 | Vector database | Qdrant (local Docker, verified live) |
-| Graph database | Neo4j — **not yet built** (still "later phase", see status note below) |
-| Cache | Redis — provisioned in `docker-compose.yml` but not yet wired into any code path |
+| Graph database | Neo4j — built and verified (`src/08_neo4j_graph.py` loads the graph, `backend/graph.py` queries it, `GET /graph/insights/{movie_id}` exposes it, both UIs render it) |
+| Cache | Redis — built and verified (`recommender.recommend_for_user` cache-aside, 5 min TTL; confirmed ~24x speedup on cache hit) |
 | Relational DB | PostgreSQL (used for feedback storage; SQLite fallback when unreachable) |
 | LLM API | Claude API (Haiku/Sonnet) **or** Groq (Llama 3.x, free tier) — provider auto-selected by whichever `ANTHROPIC_API_KEY`/`GROQ_API_KEY` is set, Anthropic preferred |
 | LLM orchestration | LangChain (LCEL chains, PromptTemplates); retrieval is direct cosine search over content vectors, not a Qdrant-backed retriever object |
-| Observability | Langfuse — **not yet wired up** (optional hook exists in code but has never been exercised with real keys; see status note below) |
+| Observability | Langfuse — built and verified (`backend/llm_chains.py`'s `_invoke_or_none` attaches a `CallbackHandler` to every chain call; a real trace was confirmed to land at cloud.langfuse.com via their public API) |
 | Backend | FastAPI (plain JSON responses — no SSE streaming implemented) |
 | Frontend | React (Vite), built and verified — see Phase 3 below |
 | Public demo | Streamlit, built and verified locally — **not yet deployed** to Streamlit Community Cloud |
@@ -76,36 +76,44 @@ Layer 2: Embedding pipeline (offline, batch)
 Layer 3: Storage
   Qdrant   - vector search (collab vectors); content vectors searched via
              plain numpy/cosine in recommender.py, not stored in Qdrant
-  Neo4j    - NOT YET BUILT. Still deferred ("later phase") -- no graph queries
-             exist anywhere in the codebase yet.
-  Redis    - provisioned in docker-compose.yml (container runs) but no
-             application code reads/writes it yet -- not actually wired in.
+  Neo4j    - graph: (User)-[:RATED {rating,timestamp}]->(Movie)-[:HAS_GENRE]->(Genre).
+             Loaded by src/08_neo4j_graph.py from the same ratings/items data
+             as everything else (55,375 RATED edges, 2,893 HAS_GENRE edges on
+             ml-100k). Queried by backend/graph.py for co-rater and
+             shared-genre traversals -- a genuinely different signal than the
+             vector stores (real other-user behaviour, not a similarity score).
+  Redis    - cache-aside for GET /recommendations/{user_id} (5 min TTL,
+             keyed on user_id+k). Numpy/no-cache fallback if unreachable.
   Postgres - feedback logs (SQLite fallback when Postgres isn't reachable)
 
 Layer 4: Online pipeline (per request)
   Step 1: Candidate generation - cosine search over content vectors -> ~30 candidates
-  Step 2: Ranking - two-tower dot product + 0.30 * log-popularity prior (hybrid scorer)
+  Step 2: Ranking - two-tower dot product + 0.30 * log-popularity prior (hybrid scorer),
+          Redis-cached per (user_id, k) for 5 minutes
   Step 3: LLM reasoning (LangChain), when ANTHROPIC_API_KEY or GROQ_API_KEY is set:
     a) Conversational query parsing (RAG)
     b) Re-ranking top ~30 -> final 10 (de-duplicated -- free-tier models can repeat ids)
     c) "Why this?" explanation generation (grounded in real metadata + plot when available)
     d) Cold-start onboarding chat (new users)
     Without a key, falls back to retrieval-only results (no crash).
-  Langfuse tracing hook exists in code but has NOT been exercised with real
-  keys yet -- see status note below.
+    Every chain invocation traced to Langfuse when configured (see Layer 5).
+  Step 4: Graph insights (GET /graph/insights/{movie_id}) -- co-raters and
+          shared-genre movies via Neo4j traversal, independent of steps 1-3.
 
 Layer 5: Backend (FastAPI) -- built and verified
-  GET  /recommendations/{user_id}
-  POST /chat          (conversational search)
-  POST /onboarding    (cold-start dialogue)
+  GET  /recommendations/{user_id}   (Redis-cached)
+  POST /chat          (conversational search, Langfuse-traced)
+  POST /onboarding    (cold-start dialogue, Langfuse-traced)
   POST /feedback      (clicks, ratings -> retraining)
-  GET  /explain/{movie_id}
-  GET  /health         (status, active LLM provider, feedback backend)
-  Docker-compose: API + Qdrant + Postgres + Redis (Langfuse Cloud, not self-hosted)
+  GET  /explain/{movie_id}          (Langfuse-traced)
+  GET  /graph/insights/{movie_id}   (Neo4j traversal)
+  GET  /health         (status, active LLM provider, feedback backend, cache, graph)
+  Docker-compose: API + Qdrant + Postgres + Redis + Neo4j (Langfuse Cloud, not self-hosted)
   CORS enabled for the Vite dev server origin.
 
 Layer 6: React Frontend -- built and verified (frontend/, Vite + react-router)
-  Recommendation cards (poster + score + genres + cast + "Why this?" panel)
+  Recommendation cards (poster + score + genres + cast + "Why this?" panel
+  + "Graph insights" panel)
   Chat interface (LLM dialogue for conversational search)
   Onboarding wizard (cold-start flow)
   Thumbs up/down feedback
@@ -113,25 +121,32 @@ Layer 6: React Frontend -- built and verified (frontend/, Vite + react-router)
 
 Phase 3.5: Streamlit public demo -- built and verified locally, not yet
   deployed to Streamlit Community Cloud. streamlit_app/app.py, thin wrapper
-  over backend/recommender.py + llm_chains.py (no API hop).
+  over backend/recommender.py + llm_chains.py + graph.py (no API hop). Uses
+  st.session_state to persist results across reruns -- per-card buttons
+  (Explain, Graph insights, Liked, ...) each trigger a Streamlit rerun, and
+  without session_state the whole recommendation list would vanish on any
+  of those clicks (a real bug found and fixed while adding Graph insights).
 ```
 
-### Status note: Neo4j and Langfuse
-Both appear in the tech-stack table above because they're part of the
-original design, but **neither is built yet**:
-- **Neo4j**: zero code exists. No graph schema, no driver, no queries. It
-  would slot into Layer 3 as a `user -> rated -> movie -> directed_by ->
-  person -> directed -> movie` graph, used for explanations like "because
-  you liked movies by this director" or graph-based candidate generation.
-  Nothing downstream currently depends on it.
-- **Langfuse**: only prototyped in `notebooks/06_llm_layer.ipynb`'s "Langfuse
-  tracing" section (a `CallbackHandler` gated behind `LANGFUSE_PUBLIC_KEY` /
-  `LANGFUSE_SECRET_KEY`) -- `backend/llm_chains.py` has NO Langfuse code at
-  all, the notebook prototype was never carried into the production backend.
-  The notebook's keys have also never actually been provided, so even that
-  prototype path has never run end-to-end; it degrades silently
-  (`LANGFUSE_AVAILABLE = False`) when unset, same pattern as every other
-  optional integration in this codebase.
+### Status note: Neo4j, Langfuse, Redis
+All three are now built and verified end-to-end (not just "no errors thrown"
+-- see below for how each was actually confirmed):
+- **Neo4j**: `src/08_neo4j_graph.py` loads the graph (MERGE-based, idempotent,
+  batched); `backend/graph.py` queries it (`graph_insights()`); wired into
+  `GET /graph/insights/{movie_id}` and a "Graph insights" button/panel in
+  both the React and Streamlit UIs. Verified against real data: e.g. Star
+  Wars (movie_id 50) correctly shows 501 raters and Return of the
+  Jedi/Raiders of the Lost Ark as top co-liked/shared-genre movies.
+- **Langfuse**: `backend/llm_chains.py`'s `_invoke_or_none()` attaches a
+  `CallbackHandler` to every chain `.invoke()` call when
+  `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` are set. Verified by calling
+  `explain_recommendation()` and then confirming via Langfuse's own public
+  API (`GET /api/public/traces`) that a real trace landed on their servers
+  -- not just that the code ran without throwing.
+- **Redis**: `recommender.recommend_for_user()` does cache-aside with a
+  5-minute TTL, keyed `recs:{user_id}:{k}`. Verified with a direct timing
+  test: first call (cache miss) ~24ms, second call (cache hit) ~1ms, results
+  identical. Falls back to always-fresh computation if Redis is unreachable.
 
 ---
 
@@ -146,11 +161,11 @@ original design, but **neither is built yet**:
    - In-batch negatives + logQ popularity correction (CRITICAL — without this the model loses to a popularity baseline)
    - 64-dim towers, item tower takes [ID embedding + 19 genre flags]
 
-3. **Hybrid retrieval:** ANN(collab vector) + ANN(content vector of recent favorites) + trending fallback = ~200 candidates
+3. **Hybrid retrieval:** cosine search over content vectors (~30 candidates) for conversational search; two-tower + log-popularity prior for the returning-user path. (Not literally Qdrant-filtered content search + a separate trending fallback as the original design sketch said -- see `backend/recommender.py` for what's actually implemented.)
 
-4. **RAG pattern for conversations:** embed user query → Qdrant filtered search → LLM generates from retrieved real movies only (no hallucinations)
+4. **RAG pattern for conversations:** embed user query → cosine search over content vectors → LLM generates from retrieved real movies only (no hallucinations)
 
-5. **Langfuse from day 1:** trace every LLM call, monitor cost/latency, version prompts, attach feedback signals
+5. **Langfuse traces every LLM call:** implemented via `_invoke_or_none()` in `backend/llm_chains.py` wrapping every chain invocation with a callback handler when configured -- see the status note above for how this was verified.
 
 ---
 
@@ -183,28 +198,33 @@ src/07_omdb_enrichment.py       # Poster/plot/cast via OMDb (no notebook mirror 
                                  # it's a batch data script, not exploratory/teaching
                                  # content). Title+year matched, since ml-100k ships
                                  # no links.csv. Multi-key rotation for daily quota.
+src/08_neo4j_graph.py            # Loads User-RATED->Movie, Movie-HAS_GENRE->Genre
+                                 # into Neo4j (also no notebook mirror -- batch script).
 ```
 
 ### Phase 2 — FastAPI backend
 ```
 backend/
   main.py                  # FastAPI app, all routes
-  recommender.py           # Core pipeline: ANN -> rank -> LLM
+  recommender.py           # Core pipeline: ANN -> rank -> LLM, Redis cache-aside
   embedder.py              # E5 content embedding utility
-  llm_chains.py            # LangChain chains (rerank, explain, onboarding, RAG)
+  llm_chains.py            # LangChain chains (rerank, explain, onboarding, RAG), Langfuse-traced
   feedback.py              # Feedback capture -> Postgres
-  docker-compose.yml       # API + Qdrant + Postgres + Redis + Langfuse
+  graph.py                 # Neo4j queries -- graph_insights() for GET /graph/insights
+  docker-compose.yml       # API + Qdrant + Postgres + Redis + Neo4j (Langfuse Cloud, not self-hosted)
 ```
 
 ### Phase 3 — React frontend
 ```
 frontend/
   src/
+    api.js                     # Fetch client for all FastAPI routes
     components/
-      RecommendationCard.jsx    # Poster + score + "Why this?" expandable
+      RecommendationCard.jsx    # Poster + score + "Why this?" + Graph insights
       ChatSearch.jsx            # Conversational search input
       OnboardingWizard.jsx      # Cold-start dialogue flow
       ExplainPanel.jsx          # Detailed explanation panel
+      GraphInsights.jsx          # Co-raters + shared-genre movies via Neo4j
     pages/
       Home.jsx
       Search.jsx
@@ -217,22 +237,28 @@ is a **separate, lightweight deployment** for public/online access (recruiters,
 portfolio reviewers) without needing to host React + FastAPI + Docker infra.
 ```
 streamlit_app/
-  app.py                   # Single-page Streamlit app: calls backend/recommender.py
-                            # and llm_chains.py directly (no separate API hop)
-  requirements.txt          # Streamlit-only subset of deps (no Neo4j/Redis/Postgres —
-                            # use lightweight fallbacks: SQLite/local pickle for demo data)
+  app.py                   # Single-page Streamlit app: calls backend/recommender.py,
+                            # llm_chains.py, and graph.py directly (no separate API hop)
+  requirements.txt          # Streamlit-only subset of deps, including redis/neo4j/langfuse
 ```
 Notes:
 - Deploy via Streamlit Community Cloud (free, connects directly to the GitHub repo)
   -- **not done yet**; the app is built and verified locally only.
 - Because Streamlit Cloud has no Docker-compose, the demo already degrades
   gracefully: Qdrant -> local/in-memory vector search fallback; Postgres ->
-  SQLite (`backend/feedback.db`); Neo4j/Redis skipped (neither is used yet
-  regardless of environment -- see the Neo4j/Langfuse status note above).
-- Secrets (`ANTHROPIC_API_KEY` or `GROQ_API_KEY`, `OMDB_API_KEY`) go in
-  Streamlit Cloud's secrets manager once deployed, not `.env`.
-- `streamlit_app/app.py` is already a thin UI wrapper reusing
-  `recommender.py` / `llm_chains.py` from the backend, as designed.
+  SQLite (`backend/feedback.db`); Redis/Neo4j -> features that use them
+  (caching, Graph insights) just silently skip if unreachable, same pattern
+  as everything else.
+- Secrets (`ANTHROPIC_API_KEY` or `GROQ_API_KEY`, `OMDB_API_KEY`,
+  `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`) go in Streamlit Cloud's
+  secrets manager once deployed, not `.env`.
+- `streamlit_app/app.py` is a thin UI wrapper reusing `recommender.py` /
+  `llm_chains.py` / `graph.py` from the backend, as designed. It uses
+  `st.session_state` to persist recommendation results across reruns --
+  without this, clicking ANY per-card button (Explain, Graph insights,
+  Liked, ...) would make the whole result list disappear, since each button
+  click triggers a Streamlit rerun where the primary "Recommend"/"Search"
+  button's own `st.button()` call returns `False` again.
 
 ---
 
@@ -245,17 +271,22 @@ Notes:
       numbered notebooks -- see nested `cinemind_phase1/CLAUDE.md`), each executed
       end-to-end with real output saved
 - [x] `src/07_omdb_enrichment.py` -- poster/plot/cast enrichment, 1,548/1,682 matched
-- [x] FastAPI backend (`backend/`) -- all 6 routes, Docker Compose stack, CORS
+- [x] `src/08_neo4j_graph.py` + `backend/graph.py` -- graph loaded and queried, verified
+- [x] Redis cache-aside for recommendations -- verified with a real timing test
+- [x] Langfuse tracing -- verified via Langfuse's own public API that a trace landed
+- [x] FastAPI backend (`backend/`) -- all 7 routes, Docker Compose stack, CORS
 - [x] React frontend (`frontend/`) -- all components/pages, verified in a real
       browser via Playwright against the live Docker API
 - [x] Streamlit public demo (`streamlit_app/app.py`) -- verified locally in browser
 
 ## What's genuinely left
 - [ ] Deploy the Streamlit app to Streamlit Community Cloud (public link)
-- [ ] Neo4j graph layer -- not started at all (see status note above)
-- [ ] Langfuse tracing -- code path exists but never exercised with real keys
 - [ ] The remaining ~134 unmatched movies in OMDb enrichment (obscure titles;
       may just not exist in OMDb's catalogue)
+- [ ] Neo4j graph is currently genre + rating structure only -- no Director
+      node/edge (the original design's "because you liked movies by this
+      director" use case), since OMDb's Director field was never captured
+      into `movie_meta.csv`
 
 ---
 
@@ -286,15 +317,20 @@ docker compose --env-file .env -f backend/docker-compose.yml up -d --build
 ANTHROPIC_API_KEY=your_key      # optional -- paid, preferred if set
 GROQ_API_KEY=your_key           # optional -- free tier, used if Anthropic isn't set
 OMDB_API_KEY=your_key           # optional -- poster/plot/cast; comma-separate multiple keys to rotate on quota
-LANGFUSE_PUBLIC_KEY=your_key    # optional -- tracing, never exercised yet (see status note)
+LANGFUSE_PUBLIC_KEY=your_key    # optional -- tracing (verified working, see status note)
 LANGFUSE_SECRET_KEY=your_key    # optional
+LANGFUSE_HOST=https://cloud.langfuse.com   # optional, this is the default
 QDRANT_URL=http://localhost:6333
 POSTGRES_URL=postgresql://user:pass@localhost:5432/cinemind
-REDIS_URL=redis://localhost:6379   # provisioned, not yet used by any code
+REDIS_URL=redis://localhost:6379   # recommendation cache, 5 min TTL
+NEO4J_URI=bolt://localhost:7687     # graph insights
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=cinemind123          # matches backend/docker-compose.yml's NEO4J_AUTH
 ```
 Everything above is optional in the sense that the app runs and degrades
-gracefully without it (numpy fallback, SQLite fallback, retrieval-only mode)
--- see `backend/recommender.py` and `backend/llm_chains.py`.
+gracefully without it (numpy fallback, SQLite fallback, retrieval-only mode,
+no cache, no graph insights) -- see `backend/recommender.py`,
+`backend/llm_chains.py`, and `backend/graph.py`.
 
 ---
 

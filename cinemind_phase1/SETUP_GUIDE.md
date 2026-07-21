@@ -8,7 +8,7 @@ data, running every script in VS Code, and saving your work to GitHub. It assume
 
 ## Part 0 — What you are building
 
-Seven Python scripts that together prove the core idea of CineMind works,
+Eight Python scripts that together prove the core idea of CineMind works,
 plus a FastAPI backend, a React frontend, and a Streamlit demo built on top
 of them (covered in Part 9):
 
@@ -20,10 +20,11 @@ of them (covered in Part 9):
 05_qdrant_indexing   ->  load vectors into a vector database, test fast search
 06_evaluation        ->  compare everything, produce the results table
 07_omdb_enrichment   ->  (optional) fetch posters/plot/cast for the UI
+08_neo4j_graph       ->  (optional) load ratings/genres into a graph database
 ```
 
 Each script saves files that the next one uses. Run them **in order, 01 to 06**
-(07 is optional and independent — it only needs the output of 01).
+(07 and 08 are optional and independent — they only need the output of 01).
 
 ---
 
@@ -78,7 +79,8 @@ cinemind_phase1/
 │   ├── 04_two_tower.py
 │   ├── 05_qdrant_indexing.py
 │   ├── 06_evaluation.py
-│   └── 07_omdb_enrichment.py   <- optional, added after core Phase 1
+│   ├── 07_omdb_enrichment.py   <- optional, added after core Phase 1
+│   └── 08_neo4j_graph.py       <- optional, added after core Phase 1
 ├── data/                   <- you will put the downloaded data here
 ├── artifacts/              <- the scripts create this automatically
 ├── backend/                <- FastAPI app (Part 9)
@@ -249,6 +251,20 @@ automatically once the first runs out for the day.
 Without this step, the API/frontend/Streamlit demo all still work — movie
 cards just show no poster image instead.
 
+### Step 8 — Graph insights (optional)
+```bash
+docker compose --env-file .env -f backend/docker-compose.yml up -d neo4j
+python src/08_neo4j_graph.py
+```
+Needs a running Neo4j (started above via Docker; no separate signup or key).
+Loads every rating and genre into a graph so the app can answer questions
+like "which other users also liked this movie, and what else did they like"
+as a direct graph traversal. Browse the graph yourself at
+`http://localhost:7474` (user `neo4j`, password from `NEO4J_PASSWORD` in
+`.env` / `backend/docker-compose.yml`). Without this step, the API/frontend/
+Streamlit demo all still work — the "Graph insights" button just reports no
+data available.
+
 ---
 
 ## Part 6 — Save your work to GitHub
@@ -371,9 +387,10 @@ to the FastAPI backend, so start that first (9.1) or the pages will show
 ### 9.4 Optional services
 Docker is optional. If Qdrant is not reachable, CineMind uses numpy search. If
 Postgres is not configured, feedback is stored in `backend/feedback.db`. To
-run the full stack in Docker instead (API + Qdrant + Postgres + Redis):
+run the full stack in Docker instead (API + Qdrant + Postgres + Redis + Neo4j):
 ```bash
 docker compose --env-file .env -f backend/docker-compose.yml up -d --build
+python src/08_neo4j_graph.py   # load the graph once Neo4j is up (Part 5, Step 8)
 ```
 Pass `--env-file` explicitly as shown — Compose's automatic `.env` lookup can
 silently miss it depending on which shell you run it from, which would make
@@ -384,4 +401,9 @@ explanations. Without an API key, the app still works in retrieval-only mode.
 Live semantic search uses the cached E5 model when available. Set
 `CINEMIND_ALLOW_MODEL_DOWNLOAD=1` before starting the app if you want it to
 download `intfloat/e5-small-v2` on first use. Set `OMDB_API_KEY` (Part 5,
-Step 7) to show posters/plot/cast in either UI.
+Step 7) to show posters/plot/cast in either UI. Set `LANGFUSE_PUBLIC_KEY`/
+`LANGFUSE_SECRET_KEY` to trace every LLM call at cloud.langfuse.com. Redis
+caches recommendation responses for 5 minutes when reachable; Neo4j powers
+the "Graph insights" button once loaded (Part 5, Step 8) — both are optional
+and everything works without them, just without the cache speedup / graph
+panel.

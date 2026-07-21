@@ -29,6 +29,9 @@ export const onboard = (answers) =>
 export const explainMovie = (movieId, query = "this recommendation") =>
   request(`/explain/${movieId}?query=${encodeURIComponent(query)}`);
 
+export const getGraphInsights = (movieId, k = 5) =>
+  request(`/graph/insights/${movieId}?k=${k}`);
+
 export const sendFeedback = (userId, movieId, { rating, clicked } = {}) =>
   request("/feedback", {
     method: "POST",

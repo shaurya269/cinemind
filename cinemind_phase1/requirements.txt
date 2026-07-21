@@ -21,3 +21,4 @@ fastapi
 uvicorn
 psycopg2-binary
 redis
+neo4j                  # graph layer (src/08_neo4j_graph.py, backend/graph.py)

@@ -1,4 +1,4 @@
-# CineMind Phase 2 stack: API + Qdrant + Postgres + Redis.
+# CineMind Phase 2 stack: API + Qdrant + Postgres + Redis + Neo4j.
 #
 # Langfuse is intentionally NOT self-hosted here -- notebooks/06_llm_layer.ipynb
 # and backend/llm_chains.py point at Langfuse Cloud via LANGFUSE_HOST
@@ -35,6 +35,9 @@ services:
       QDRANT_URL: http://qdrant:6333
       POSTGRES_URL: postgresql://cinemind:cinemind@postgres:5432/cinemind
       REDIS_URL: redis://redis:6379
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: cinemind123
     volumes:
       - ../data:/app/data:ro
       - ../artifacts:/app/artifacts:ro
@@ -42,6 +45,7 @@ services:
       - qdrant
       - postgres
       - redis
+      - neo4j
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -68,7 +72,18 @@ services:
     volumes:
       - redis_data:/data
 
+  neo4j:
+    image: neo4j:5-community
+    environment:
+      NEO4J_AUTH: neo4j/cinemind123
+    ports:
+      - "7474:7474"   # browser UI -- http://localhost:7474
+      - "7687:7687"   # bolt protocol -- used by src/08_neo4j_graph.py and backend/graph.py
+    volumes:
+      - neo4j_data:/data
+
 volumes:
   qdrant_data:
   postgres_data:
   redis_data:
+  neo4j_data:

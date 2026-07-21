@@ -9,6 +9,7 @@ Routes (per CLAUDE.md):
     POST /onboarding                  -- cold-start dialogue for new users
     POST /feedback                    -- clicks/ratings -> storage for retraining
     GET  /explain/{movie_id}          -- grounded "Why this?" explanation
+    GET  /graph/insights/{movie_id}   -- graph-derived context (co-raters, shared genres)
     GET  /health                      -- readiness probe
 
 Run locally (no Docker required -- everything below degrades gracefully):
@@ -27,6 +28,7 @@ from pydantic import BaseModel
 import recommender
 import llm_chains
 import feedback
+import graph
 
 app = FastAPI(title="CineMind API", version="0.1.0")
 
@@ -44,6 +46,7 @@ app.add_middleware(
 @app.on_event("startup")
 def _startup():
     recommender.load()
+    graph.load()
 
 
 class ChatRequest(BaseModel):
@@ -67,7 +70,10 @@ def health():
         "status": "ok",
         "llm_available": llm_chains.LLM_AVAILABLE,
         "llm_provider": llm_chains.LLM_PROVIDER,
+        "langfuse_tracing": llm_chains.LANGFUSE_AVAILABLE,
         "feedback_backend": feedback.backend_in_use(),
+        "recs_cache": "redis" if recommender._redis_client is not None else "none",
+        "graph_available": graph.GRAPH_AVAILABLE,
     }
 
 
@@ -102,3 +108,15 @@ def explain(movie_id: int, query: str = "this recommendation"):
     if explanation is None:
         raise HTTPException(status_code=404, detail=f"Unknown movie_id={movie_id}")
     return {"movie_id": movie_id, "explanation": explanation}
+
+
+@app.get("/graph/insights/{movie_id}")
+def graph_insights(movie_id: int, k: int = 5):
+    insights = graph.graph_insights(movie_id, k=k)
+    if insights is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No graph data for movie_id={movie_id} (unrated in training data, "
+                    "or Neo4j isn't reachable -- check GET /health's graph_available field).",
+        )
+    return {"movie_id": movie_id, **insights}
