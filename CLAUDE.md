@@ -124,11 +124,12 @@ original design, but **neither is built yet**:
   person -> directed -> movie` graph, used for explanations like "because
   you liked movies by this director" or graph-based candidate generation.
   Nothing downstream currently depends on it.
-- **Langfuse**: `backend/llm_chains.py` and `notebooks/06_llm_layer.ipynb`
-  both have an optional Langfuse callback-handler hook (see the "Langfuse
-  tracing" section of the notebook), gated behind `LANGFUSE_PUBLIC_KEY` /
-  `LANGFUSE_SECRET_KEY` being set -- but those keys have never actually been
-  provided, so this path has never run end-to-end. It degrades silently
+- **Langfuse**: only prototyped in `notebooks/06_llm_layer.ipynb`'s "Langfuse
+  tracing" section (a `CallbackHandler` gated behind `LANGFUSE_PUBLIC_KEY` /
+  `LANGFUSE_SECRET_KEY`) -- `backend/llm_chains.py` has NO Langfuse code at
+  all, the notebook prototype was never carried into the production backend.
+  The notebook's keys have also never actually been provided, so even that
+  prototype path has never run end-to-end; it degrades silently
   (`LANGFUSE_AVAILABLE = False`) when unset, same pattern as every other
   optional integration in this codebase.
 
