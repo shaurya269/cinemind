@@ -36,7 +36,7 @@ services:
     healthCheckPath: /health
     envVars:
       - key: CORS_ORIGINS
-        value: https://cinemind.vercel.app
+        value: https://cinemind-pink.vercel.app
       - key: CINEMIND_ALLOW_MODEL_DOWNLOAD
         value: "1"
       - key: ANTHROPIC_API_KEY
