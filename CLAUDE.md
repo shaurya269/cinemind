@@ -1,5 +1,24 @@
 # CineMind — Project Context for Claude Code
 
+## Version control (standing authorization)
+This repo is pushed to **github.com/shaurya269/cinemind** (public). The user
+has explicitly pre-authorized autonomous `git commit` + `git push` under
+these rules, so no need to ask permission each time -- this note is that
+advance authorization:
+- Commit after completing a meaningful unit of work (a feature, a fix, a
+  doc/diagram sync) -- not after every tiny edit.
+- Push after a completed task, or after a small batch of a few commits --
+  don't push after literally every single commit if several are landing in
+  quick succession as part of one continuous task.
+- If genuinely unsure whether to push yet, it's fine to ask -- but proactively
+  push (don't wait to be asked) whenever context/session limits might be
+  approaching, so finished work is never left stranded uncommitted/unpushed.
+- Standard safety rules still apply on top of this: never force-push, never
+  push over history you didn't create locally, always check `git status`/diff
+  for secrets before committing (`.env` is gitignored -- verify new secret-like
+  files get the same treatment), and never commit `.env`, `node_modules/`,
+  `data/`, `artifacts/`, or other gitignored paths even if `-A`-added by habit.
+
 ## Project Title
 **CineMind: An LLM-Augmented Hybrid Deep Learning Framework for Personalised, Explainable, and Conversational Movie & Show Recommendation**
 
