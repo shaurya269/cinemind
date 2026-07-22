@@ -110,7 +110,7 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     color: #c9a15a;
     font-size: 0.85rem;
 }
-</style>
+</style
 """
 
 
@@ -130,7 +130,61 @@ def load_recommender():
     return True
 
 
-def render_movie_card(movie, *, show_feedback=False, user_id=None):
+@st.cache_data(ttl=300, show_spinner="Fetching recommendations...")
+def cached_recommend_for_user(user_id: int, k: int):
+    """Streamlit-local cache mirroring recommender.py's Redis cache-aside (5 min TTL),
+    since Streamlit Cloud has no Redis sidecar to fall back on."""
+    return recommender.recommend_for_user(user_id, k=k)
+
+
+@st.cache_data(ttl=300, show_spinner="Searching...")
+def cached_conversational_search(query: str):
+    return llm_chains.conversational_search(query)
+
+
+@st.cache_data(ttl=300, show_spinner="Finding seed movies...")
+def cached_onboard_new_user(answers: str):
+    return llm_chains.onboard_new_user(answers)
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def cached_similar_to_movie(movie_id: int, k: int = 3):
+    return recommender.similar_to_movie(movie_id, k=k)
+
+
+def render_results_with_genre_filter(results, *, key, show_feedback=False, user_id=None):
+    """Shared genre-multiselect + filtered card list, used by every results tab.
+    key_prefix keeps widget keys unique across tabs -- all tabs render in the same
+    script run, so the same movie appearing in two tabs at once would otherwise
+    collide on e.g. "explain-{movie_id}-{title}"."""
+    if not results:
+        return
+    all_genres = sorted({
+        g for m in results for g in re.findall(r"'([^']*)'", m.get("genres", ""))
+    })
+    genre_filter = st.multiselect("Filter by genre", all_genres, key=key)
+    for movie in results:
+        if genre_filter:
+            movie_genres = re.findall(r"'([^']*)'", movie.get("genres", ""))
+            if not any(g in movie_genres for g in genre_filter):
+                continue
+        render_movie_card(movie, show_feedback=show_feedback, user_id=user_id, key_prefix=f"{key}-")
+
+
+def is_watchlisted(movie_id: int) -> bool:
+    return movie_id in st.session_state.setdefault("watchlist", {})
+
+
+def toggle_watchlist(movie):
+    movie_id = int(movie.get("movie_id", -1))
+    watchlist = st.session_state.setdefault("watchlist", {})
+    if movie_id in watchlist:
+        del watchlist[movie_id]
+    else:
+        watchlist[movie_id] = movie
+
+
+def render_movie_card(movie, *, show_feedback=False, user_id=None, key_prefix=""):
     title = movie.get("title", "Unknown title")
     movie_id = int(movie.get("movie_id", -1))
     score = movie.get("score")
@@ -148,10 +202,14 @@ def render_movie_card(movie, *, show_feedback=False, user_id=None):
                 st.caption("No poster")
 
         with body_col:
-            top = st.columns([0.7, 0.3])
+            top = st.columns([0.6, 0.2, 0.2])
             top[0].markdown(f"### {title}")
+            star = "★ Saved" if is_watchlisted(movie_id) else "☆ Save"
+            if top[1].button(star, key=f"{key_prefix}watchlist-{movie_id}-{title}"):
+                toggle_watchlist(movie)
+                st.rerun()
             if score is not None:
-                top[1].markdown(
+                top[2].markdown(
                     f'<div class="cm-score" style="text-align:right;padding-top:14px;">score {float(score):.3f}</div>',
                     unsafe_allow_html=True,
                 )
@@ -165,9 +223,9 @@ def render_movie_card(movie, *, show_feedback=False, user_id=None):
                 st.markdown(f'<div class="cm-why-box">{movie["why"]}</div>', unsafe_allow_html=True)
 
         actions = st.columns([0.25, 0.25, 0.17, 0.17, 0.16])
-        if actions[0].button("Why this?", key=f"explain-{movie_id}-{title}"):
+        if actions[0].button("Why this?", key=f"{key_prefix}explain-{movie_id}-{title}"):
             st.info(llm_chains.explain_recommendation(movie_id) or "No metadata found.")
-        if actions[1].button("Graph insights", key=f"graph-{movie_id}-{title}"):
+        if actions[1].button("Graph insights", key=f"{key_prefix}graph-{movie_id}-{title}"):
             insights = graph.graph_insights(movie_id, k=3)
             if insights is None:
                 st.info("No graph data for this movie (or Neo4j isn't reachable).")
@@ -181,12 +239,12 @@ def render_movie_card(movie, *, show_feedback=False, user_id=None):
                     st.write(f"Shares the most genres with: {shared}")
 
         if show_feedback and user_id is not None:
-            if actions[2].button("Liked", key=f"like-{movie_id}"):
+            if actions[2].button("Liked", key=f"{key_prefix}like-{movie_id}"):
                 st.success(feedback.log_feedback(user_id, movie_id, clicked=True, rating=5.0))
-            if actions[3].button("Skip", key=f"skip-{movie_id}"):
+            if actions[3].button("Skip", key=f"{key_prefix}skip-{movie_id}"):
                 st.success(feedback.log_feedback(user_id, movie_id, clicked=False))
-            if actions[4].button("Similar", key=f"similar-{movie_id}"):
-                for neighbour in recommender.similar_to_movie(movie_id, k=3):
+            if actions[4].button("Similar", key=f"{key_prefix}similar-{movie_id}"):
+                for neighbour in cached_similar_to_movie(movie_id, k=3):
                     st.write(f"{neighbour['title']} ({neighbour['score']:.3f})")
 
 
@@ -214,10 +272,11 @@ def main():
     status[3].metric("Graph", "connected" if graph.GRAPH_AVAILABLE else "unavailable")
 
     st.write("")
-    tab_recs, tab_search, tab_onboarding = st.tabs([
+    tab_recs, tab_search, tab_onboarding, tab_watchlist = st.tabs([
         "Returning user",
         "Conversational search",
         "New user",
+        f"Watchlist ({len(st.session_state.get('watchlist', {}))})",
     ])
 
     # Results are stashed in session_state and re-rendered on every script
@@ -242,24 +301,18 @@ def main():
                 st.session_state.pop("recs_results", None)
             else:
                 st.session_state.pop("recs_warning", None)
-                st.session_state["recs_results"] = recommender.recommend_for_user(int(user_id), k=int(k))
+                st.session_state["recs_results"] = cached_recommend_for_user(int(user_id), int(k))
                 st.session_state["recs_user_id"] = int(user_id)
 
         if st.session_state.get("recs_warning"):
             st.warning(st.session_state["recs_warning"])
 
-        results = st.session_state.get("recs_results", [])
-        if results:
-            all_genres = sorted({
-                g for m in results for g in re.findall(r"'([^']*)'", m.get("genres", ""))
-            })
-            genre_filter = st.multiselect("Filter by genre", all_genres, key="recs_genre_filter")
-            for movie in results:
-                if genre_filter:
-                    movie_genres = re.findall(r"'([^']*)'", movie.get("genres", ""))
-                    if not any(g in movie_genres for g in genre_filter):
-                        continue
-                render_movie_card(movie, show_feedback=True, user_id=st.session_state["recs_user_id"])
+        render_results_with_genre_filter(
+            st.session_state.get("recs_results", []),
+            key="recs_genre_filter",
+            show_feedback=True,
+            user_id=st.session_state.get("recs_user_id"),
+        )
 
     with tab_search:
         st.caption(
@@ -276,11 +329,12 @@ def main():
         for col, s in zip(chip_cols, suggestions):
             if col.button(s, key=f"suggest-{s}"):
                 query = s
-                st.session_state["search_results"] = llm_chains.conversational_search(query)
+                st.session_state["search_results"] = cached_conversational_search(query)
         if st.button("Search", type="primary"):
-            st.session_state["search_results"] = llm_chains.conversational_search(query)
-        for movie in st.session_state.get("search_results", []):
-            render_movie_card(movie)
+            st.session_state["search_results"] = cached_conversational_search(query)
+        render_results_with_genre_filter(
+            st.session_state.get("search_results", []), key="search_genre_filter"
+        )
 
     with tab_onboarding:
         st.caption(
@@ -293,9 +347,22 @@ def main():
             height=110,
         )
         if st.button("Find seed movies", type="primary"):
-            st.session_state["onboarding_results"] = llm_chains.onboard_new_user(answers)
-        for movie in st.session_state.get("onboarding_results", []):
-            render_movie_card(movie)
+            st.session_state["onboarding_results"] = cached_onboard_new_user(answers)
+        render_results_with_genre_filter(
+            st.session_state.get("onboarding_results", []), key="onboarding_genre_filter"
+        )
+
+    with tab_watchlist:
+        st.caption(
+            "Movies you've saved with ☆ Save on any card, this session. "
+            "Session-only — closing the tab clears it (no account/login in this demo)."
+        )
+        watchlist = st.session_state.get("watchlist", {})
+        if not watchlist:
+            st.info("No saved movies yet. Save one from any tab with the ☆ Save button.")
+        else:
+            for movie in watchlist.values():
+                render_movie_card(movie, key_prefix="watchlist-")
 
     st.write("")
     st.divider()
