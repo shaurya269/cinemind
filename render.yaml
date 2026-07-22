@@ -37,8 +37,20 @@ services:
     envVars:
       - key: CORS_ORIGINS
         value: https://cinemind-pink.vercel.app
+      # Deliberately "0", unlike the local/Docker-compose setup: Render's
+      # free tier has 512MB RAM total, and loading the E5 sentence-transformer
+      # (~130MB + PyTorch overhead) on top of the two-tower model + content
+      # vectors already in memory was OOM-killing the process on the first
+      # Search/New-user request (Recommend never touches the embedder, which
+      # is why only those two pages were affected). With this "0",
+      # embedder.py's local_files_only=True load fails fast and
+      # recommender.retrieve_candidates() falls back to _lexical_candidates()
+      # (keyword+popularity matching) instead -- by design, see its
+      # docstring. Search quality drops from semantic to keyword-based on
+      # this deployment specifically; upgrade the Render plan for more RAM
+      # if full semantic search is wanted live.
       - key: CINEMIND_ALLOW_MODEL_DOWNLOAD
-        value: "1"
+        value: "0"
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: GROQ_API_KEY
