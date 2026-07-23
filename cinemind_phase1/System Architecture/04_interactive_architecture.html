@@ -268,7 +268,18 @@
   /* interactive figure frame */
   .figure {
     border: 1px solid var(--line); border-radius: 14px; background: var(--panel);
-    box-shadow: var(--shadow); padding: 16px; position: sticky; top: 78px;
+    box-shadow: var(--shadow); padding: 16px;
+    /* static by default (stacked layout) -- only sticks at the wide breakpoint
+       below, where a tall left column exists to stick against. Sticking it in a
+       single stacked column made it float over the cards beneath it. */
+  }
+  @media (min-width: 860px) {
+    .figure {
+      position: sticky; top: 78px;
+      /* never taller than the viewport, so it can't overlap the At-a-glance /
+         Connects-to cards below it in its own column */
+      max-height: calc(100vh - 94px); overflow-y: auto;
+    }
   }
   .figure .ftitle {
     font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px;

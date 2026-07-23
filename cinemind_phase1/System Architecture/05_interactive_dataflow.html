@@ -124,7 +124,12 @@
   .kv dt { color: var(--faint); font-weight: 600; font-family: var(--font-mono); font-size: 12px; }
   .kv dd { margin: 0; }
   code { font-family: var(--font-mono); font-size: 12.5px; background: var(--panel-2); padding: 1.5px 6px; border-radius: 5px; border: 1px solid var(--line); }
-  .figure { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); padding: 16px; position: sticky; top: 78px; }
+  .figure { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); padding: 16px; }
+  /* sticky only at the wide breakpoint (tall left column to stick against);
+     capped to viewport height so it can't float over the cards below it. */
+  @media (min-width: 860px) {
+    .figure { position: sticky; top: 78px; max-height: calc(100vh - 94px); overflow-y: auto; }
+  }
   .figure .ftitle { font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--faint); font-weight: 700; margin-bottom: 4px; }
   .figure .fnote { font-size: 12.5px; color: var(--muted); min-height: 34px; margin-top: 10px; }
   .btnrow { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
