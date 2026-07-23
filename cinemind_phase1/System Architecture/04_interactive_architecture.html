@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CineMind — Interactive Architecture</title>
+<style>
+  :root {
+    --ground: #F4F3EE;
+    --panel: #FFFFFF;
+    --panel-2: #FAF9F5;
+    --ink: #191D24;
+    --muted: #5A6473;
+    --faint: #8A93A2;
+    --accent: #E8493A;        /* CineMind marquee-red, from index.css */
+    --accent-soft: #FBE7E4;
+    --gold: #B98514;
+    --teal: #1F9E88;
+    --line: #E2E0D7;
+    --line-strong: #CBC9BE;
+    --shadow: 0 1px 2px rgba(24,28,36,.05), 0 8px 24px rgba(24,28,36,.06);
+
+    /* the six architecture layers (kept consistent w/ 01_system_architecture) */
+    --l1: #4A6FC0; --l1-bg: #EAF0FB;   /* data        */
+    --l2: #8261CC; --l2-bg: #F1ECFB;   /* embeddings  */
+    --l3: #1F9E88; --l3-bg: #E6F6F1;   /* storage     */
+    --l4: #B9860F; --l4-bg: #FBF2DF;   /* online/LLM  */
+    --l5: #3F9A46; --l5-bg: #EBF6EA;   /* backend     */
+    --l6: #C24E82; --l6-bg: #FBE8F0;   /* frontend    */
+
+    --font-display: "Bebas Neue", "Arial Narrow", "Haettenschweiler", sans-serif;
+    --font-body: "Inter", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "Cascadia Code", "Consolas", "SFMono-Regular", ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0E1116;
+      --panel: #171B22;
+      --panel-2: #1D222B;
+      --ink: #ECEAE3;
+      --muted: #9AA3B4;
+      --faint: #626C7E;
+      --accent: #F1584A;
+      --accent-soft: #331A18;
+      --gold: #E3B65A;
+      --teal: #4FD1B8;
+      --line: #29303C;
+      --line-strong: #38414F;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+      --l1: #7C9CE8; --l1-bg: #182236;
+      --l2: #B79BF0; --l2-bg: #221B35;
+      --l3: #4FD1B8; --l3-bg: #122C28;
+      --l4: #F0C463; --l4-bg: #2F2610;
+      --l5: #82D18A; --l5-bg: #152D18;
+      --l6: #F08FBB; --l6-bg: #321D28;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0E1116; --panel: #171B22; --panel-2: #1D222B;
+    --ink: #ECEAE3; --muted: #9AA3B4; --faint: #626C7E;
+    --accent: #F1584A; --accent-soft: #331A18; --gold: #E3B65A; --teal: #4FD1B8;
+    --line: #29303C; --line-strong: #38414F;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    --l1: #7C9CE8; --l1-bg: #182236; --l2: #B79BF0; --l2-bg: #221B35;
+    --l3: #4FD1B8; --l3-bg: #122C28; --l4: #F0C463; --l4-bg: #2F2610;
+    --l5: #82D18A; --l5-bg: #152D18; --l6: #F08FBB; --l6-bg: #321D28;
+  }
+  :root[data-theme="light"] {
+    --ground: #F4F3EE; --panel: #FFFFFF; --panel-2: #FAF9F5;
+    --ink: #191D24; --muted: #5A6473; --faint: #8A93A2;
+    --accent: #E8493A; --accent-soft: #FBE7E4; --gold: #B98514; --teal: #1F9E88;
+    --line: #E2E0D7; --line-strong: #CBC9BE;
+    --shadow: 0 1px 2px rgba(24,28,36,.05), 0 8px 24px rgba(24,28,36,.06);
+    --l1: #4A6FC0; --l1-bg: #EAF0FB; --l2: #8261CC; --l2-bg: #F1ECFB;
+    --l3: #1F9E88; --l3-bg: #E6F6F1; --l4: #B9860F; --l4-bg: #FBF2DF;
+    --l5: #3F9A46; --l5-bg: #EBF6EA; --l6: #C24E82; --l6-bg: #FBE8F0;
+  }
+
+  /* Bebas Neue is not guaranteed installed; the display face degrades to a
+     narrow condensed sans, which keeps the marquee feel without a webfont. */
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-body);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 16px;
+    padding: 14px 26px;
+    background: color-mix(in srgb, var(--ground) 86%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand {
+    display: flex; align-items: baseline; gap: 10px;
+    cursor: pointer; user-select: none;
+  }
+  .brand .logo {
+    font-family: var(--font-display);
+    font-size: 30px; letter-spacing: 1.5px; line-height: 1;
+    color: var(--ink);
+    position: relative;
+  }
+  .brand .logo::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -4px;
+    height: 3px; background: var(--accent); border-radius: 2px;
+  }
+  .brand .kicker {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 2px;
+    color: var(--faint); font-weight: 600;
+  }
+  .crumbs { flex: 1; font-size: 13px; color: var(--muted); }
+  .crumbs b { color: var(--ink); font-weight: 600; }
+  .topbtn {
+    border: 1px solid var(--line-strong); background: var(--panel);
+    color: var(--muted); border-radius: 8px; padding: 7px 12px;
+    font-size: 12.5px; font-weight: 600; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px;
+    transition: border-color .15s, color .15s, transform .1s;
+  }
+  .topbtn:hover { color: var(--ink); border-color: var(--accent); }
+  .topbtn:active { transform: translateY(1px); }
+
+  /* ---------- shared wrap ---------- */
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 32px 26px 100px; }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 26px 0 8px; }
+  .hero h1 {
+    font-family: var(--font-display);
+    font-weight: 400; letter-spacing: .5px;
+    font-size: clamp(38px, 6vw, 64px); line-height: .98; margin: 0 0 10px;
+    text-wrap: balance;
+  }
+  .hero h1 .rd { color: var(--accent); }
+  .hero p.lede { font-size: 16.5px; color: var(--muted); max-width: 68ch; margin: 0; }
+  .hint {
+    margin-top: 18px; font-size: 13px; color: var(--faint);
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .hint .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+    animation: pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:.35; transform:scale(.8)} 50%{opacity:1; transform:scale(1.15)} }
+
+  /* ---------- legend ---------- */
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 26px 0 8px; }
+  .legend .li { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+  .legend .sw { width: 12px; height: 12px; border-radius: 3px; }
+
+  /* ---------- the map ---------- */
+  .layer {
+    margin-top: 22px; border: 1px solid var(--line);
+    border-radius: 16px; background: var(--panel); box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .layer-head {
+    display: flex; align-items: center; gap: 12px;
+    padding: 13px 18px; border-bottom: 1px solid var(--line);
+    background: var(--lbg, var(--panel-2));
+  }
+  .layer-tag {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+    color: #fff; background: var(--lc, var(--accent));
+    padding: 3px 8px; border-radius: 6px; letter-spacing: .5px;
+  }
+  .layer-name { font-weight: 700; font-size: 15px; }
+  .layer-role { color: var(--muted); font-size: 13px; margin-left: auto; text-align: right; }
+  .comp-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 12px; padding: 16px;
+  }
+  .comp {
+    text-align: left; cursor: pointer;
+    border: 1px solid var(--line); border-left: 3px solid var(--lc, var(--accent));
+    background: var(--panel-2); border-radius: 11px; padding: 13px 14px;
+    display: flex; flex-direction: column; gap: 5px;
+    transition: transform .13s ease, box-shadow .13s ease, border-color .13s;
+    font-family: inherit;
+  }
+  .comp:hover { transform: translateY(-3px); box-shadow: var(--shadow); border-color: var(--lc); }
+  .comp:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .comp .ic { font-size: 18px; }
+  .comp .cn { font-weight: 700; font-size: 14px; }
+  .comp .ct { font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .comp .tool {
+    margin-top: 4px; font-family: var(--font-mono); font-size: 10.5px;
+    color: var(--lc, var(--accent)); font-weight: 600; letter-spacing: .3px;
+  }
+  .comp .badge {
+    align-self: flex-start; font-size: 9.5px; font-weight: 700; letter-spacing: .4px;
+    text-transform: uppercase; padding: 2px 6px; border-radius: 5px;
+    background: var(--accent-soft); color: var(--accent);
+  }
+
+  /* connector rows between layers */
+  .flowbar { display: flex; justify-content: center; padding: 3px 0; }
+  .flowbar svg { display: block; }
+
+  /* ---------- detail view ---------- */
+  .detail { display: none; }
+  .detail.active { display: block; animation: fade .25s ease; }
+  .map.hidden { display: none; }
+  @keyframes fade { from { opacity: 0; transform: translateY(8px);} to {opacity:1; transform:none;} }
+
+  .back {
+    display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+    background: none; border: none; color: var(--muted); font-weight: 600;
+    font-size: 13.5px; padding: 4px 0; margin-bottom: 6px; font-family: inherit;
+  }
+  .back:hover { color: var(--accent); }
+
+  .dhead { display: flex; align-items: flex-start; gap: 16px; margin: 6px 0 8px; }
+  .dhead .dic {
+    width: 58px; height: 58px; flex: none; border-radius: 14px;
+    display: grid; place-items: center; font-size: 30px;
+    background: var(--lbg); border: 1px solid var(--lc);
+  }
+  .dhead h2 { font-family: var(--font-display); font-weight: 400; letter-spacing: .5px;
+    font-size: clamp(30px, 4.5vw, 44px); margin: 2px 0 4px; line-height: 1; }
+  .dhead .dsub { color: var(--muted); font-size: 15px; }
+  .dhead .dtool {
+    display: inline-block; margin-top: 8px; font-family: var(--font-mono);
+    font-size: 12px; color: #fff; background: var(--lc); padding: 3px 9px; border-radius: 6px;
+  }
+
+  .dcols { display: grid; grid-template-columns: 1fr; gap: 22px; margin-top: 22px; }
+  @media (min-width: 860px) { .dcols { grid-template-columns: 1.05fr .95fr; } }
+
+  .card {
+    border: 1px solid var(--line); border-radius: 14px; background: var(--panel);
+    box-shadow: var(--shadow); padding: 20px 22px; margin-bottom: 18px;
+  }
+  .card h3 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.4px;
+    color: var(--faint); margin: 0 0 12px; font-weight: 700;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card h3::before { content: ""; width: 14px; height: 2px; background: var(--lc, var(--accent)); }
+  .card p { margin: 0 0 12px; font-size: 14.5px; color: var(--ink); }
+  .card p:last-child { margin-bottom: 0; }
+  .card .q { color: var(--muted); font-size: 14px; }
+  .card strong { color: var(--ink); }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13.5px; }
+  .kv dt { color: var(--faint); font-weight: 600; font-family: var(--font-mono); font-size: 12px; }
+  .kv dd { margin: 0; color: var(--ink); }
+  code, .mono { font-family: var(--font-mono); font-size: 12.5px;
+    background: var(--panel-2); padding: 1.5px 6px; border-radius: 5px; border: 1px solid var(--line); }
+  pre {
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px; overflow-x: auto; font-family: var(--font-mono);
+    font-size: 12.5px; line-height: 1.6; margin: 0 0 12px;
+  }
+  pre .cm { color: var(--faint); }
+  pre .kw { color: var(--accent); }
+  pre .st { color: var(--teal); }
+  ul.clean { margin: 0; padding-left: 18px; font-size: 14px; color: var(--ink); }
+  ul.clean li { margin-bottom: 7px; }
+  ul.clean li::marker { color: var(--lc, var(--accent)); }
+
+  /* interactive figure frame */
+  .figure {
+    border: 1px solid var(--line); border-radius: 14px; background: var(--panel);
+    box-shadow: var(--shadow); padding: 16px; position: sticky; top: 78px;
+  }
+  .figure .ftitle {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--faint); font-weight: 700; margin-bottom: 4px;
+  }
+  .figure .fnote { font-size: 12.5px; color: var(--muted); min-height: 34px; margin-top: 10px; }
+  .figstage { width: 100%; }
+  .btnrow { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .fbtn {
+    border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--ink);
+    border-radius: 8px; padding: 7px 12px; font-size: 12.5px; font-weight: 600;
+    cursor: pointer; font-family: inherit; transition: background .12s, border-color .12s;
+  }
+  .fbtn:hover { border-color: var(--accent); }
+  .fbtn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .fbtn.primary:hover { filter: brightness(1.06); }
+
+  .related { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .chip {
+    cursor: pointer; font-family: inherit; font-size: 12.5px; font-weight: 600;
+    border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--muted);
+    padding: 6px 11px; border-radius: 20px; transition: all .12s;
+  }
+  .chip:hover { color: var(--accent); border-color: var(--accent); }
+
+  .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line);
+    color: var(--faint); font-size: 12.5px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand" onclick="showMap()">
+    <span class="logo">CINEMIND</span>
+    <span class="kicker">Architecture Explorer</span>
+  </div>
+  <div class="crumbs" id="crumbs"><b>System map</b> — click any component</div>
+  <button class="topbtn" onclick="location.href='03_data_flow_diagram.html'">Static flow ↗</button>
+  <button class="topbtn" id="themeBtn" onclick="toggleTheme()">◐ Theme</button>
+</div>
+
+<!-- ============================ MAP VIEW ============================ -->
+<div class="wrap map" id="mapView">
+  <div class="hero">
+    <h1>How <span class="rd">CineMind</span> is built</h1>
+    <p class="lede">A hybrid movie recommender: a PyTorch two-tower model for taste, content
+      embeddings for meaning, a graph for real crowd behaviour, and an LLM layer that explains
+      itself — served by FastAPI, packaged with Docker. Every box below is clickable.</p>
+    <div class="hint"><span class="dot"></span> Tap a component to open a full explainer with an interactive diagram.</div>
+  </div>
+
+  <div class="legend" id="legend"></div>
+  <div id="layers"></div>
+
+  <div class="footer">
+    <span>CineMind — two-tower deep learning + LLM reasoning, MovieLens 100K.</span>
+    <span>Interactive companion to <code>01_system_architecture.html</code></span>
+  </div>
+</div>
+
+<!-- ============================ DETAIL VIEW ============================ -->
+<div class="wrap detail" id="detailView"></div>
+
+<script>
+/* ------------------------------------------------------------------ *
+ *  DATA: layers + components (grounded in the actual backend/ code)   *
+ * ------------------------------------------------------------------ */
+const LAYERS = [
+  { id:"l1", tag:"L1", name:"Data", role:"Raw ratings + movie metadata", comps:["movielens","omdb"] },
+  { id:"l2", tag:"L2", name:"Learning & Embeddings", role:"Turn history + text into vectors", comps:["twotower","e5","rbm"] },
+  { id:"l3", tag:"L3", name:"Storage", role:"Where vectors, graph, cache & feedback live", comps:["qdrant","neo4j","redis","postgres"] },
+  { id:"l4", tag:"L4", name:"Reasoning (LLM)", role:"Parse, re-rank & explain in language", comps:["langchain","langfuse"] },
+  { id:"l5", tag:"L5", name:"Backend & Packaging", role:"Serve it, ship it", comps:["fastapi","docker"] },
+  { id:"l6", tag:"L6", name:"Frontend", role:"What people actually touch", comps:["react","streamlit"] },
+];
+
+const C = {
+  movielens: {
+    ic:"🎞️", name:"MovieLens 100K", layer:"l1", tool:"ml-100k dataset",
+    sub:"The ground truth: 100,000 real ratings the whole system learns from.",
+    what:"MovieLens 100K is a classic research dataset: <strong>943 users</strong> rating <strong>1,682 movies</strong>, 100,000 ratings in total, each on a 1–5 star scale with a timestamp. It ships three raw files — <code>u.data</code> (ratings), <code>u.item</code> (movie titles + 19 genre flags), <code>u.user</code> (demographics).",
+    how:"Script <code>01_data_exploration.py</code> reads the raw files once and writes clean CSVs the rest of the pipeline consumes: <code>train_positives.csv</code>, <code>test_positives.csv</code>, and <code>items.csv</code>. Two deliberate choices happen here — <strong>implicit feedback</strong> (a rating ≥ 4 becomes a single positive interaction; everything else is dropped) and a <strong>temporal split</strong> (each user's last 20% of ratings by timestamp becomes the test set).",
+    role_:"It is the single source of truth. The two-tower model trains on it, the content embeddings describe its movies, the Neo4j graph mirrors its rating edges, and every recommendation is a real row from <code>items.csv</code> — nothing is invented.",
+    why:"Using a temporal split instead of a random one prevents <em>future leakage</em> — the model is never tested on ratings it could have peeked at during training, so the benchmark numbers are honest.",
+    fig:"split", related:["twotower","neo4j","omdb"],
+    kv:{ "Users":"943", "Movies":"1,682", "Ratings":"100,000", "Positive if":"rating ≥ 4", "Split":"last 20% / user (temporal)" }
+  },
+  omdb: {
+    ic:"🖼️", name:"OMDb Enrichment", layer:"l1", tool:"src/07_omdb_enrichment.py",
+    sub:"Adds posters, plots and cast so recommendations look and read like a real app.",
+    what:"MovieLens gives you a title and genres — nothing visual. OMDb (the Open Movie Database API) fills that gap with a <strong>poster image, plot summary, and cast list</strong> for each film, stored in <code>artifacts/movie_meta.csv</code>.",
+    how:"ml-100k ships no <code>links.csv</code>/<code>tmdbId</code>, so there's nothing to join on. Instead script 07 matches each movie by <strong>title + year</strong> against OMDb's search API. The free tier allows 1,000 lookups/day, so the script supports <strong>comma-separated multi-key rotation</strong> and is fully resumable. So far <strong>1,548 of 1,682</strong> movies are matched.",
+    role_:"Purely presentational, and entirely optional — <code>recommender.py</code> loads it if present and returns <code>poster_url / overview / cast = None</code> for anything unmatched. The LLM 'Why this?' chain also uses the plot summary to ground its explanation in real story details.",
+    why:"It's the difference between a research demo and something that looks like a product a recruiter would actually try.",
+    fig:"enrich", related:["movielens","langchain","react"],
+    kv:{ "Source":"OMDb API", "Match key":"title + year", "Matched":"1,548 / 1,682", "Quota":"1,000/day (rotatable)", "Optional?":"yes — degrades to no poster" }
+  },
+  twotower: {
+    ic:"🗼", name:"Two-Tower Model", layer:"l2", tool:"PyTorch · src/04_two_tower.py",
+    sub:"The heart of the system: twin neural nets that learn user taste and movie identity.",
+    what:"A two-tower model is <strong>two small neural networks</strong>. One (the <em>user tower</em>) turns a user into a 64-number vector; the other (the <em>item tower</em>) turns a movie into a 64-number vector. Their <strong>dot product</strong> is a match score — high means 'this user will like this movie'. The item tower takes both a movie ID embedding and its 19 genre flags.",
+    how:"Training uses <strong>in-batch negatives</strong>: in a batch of 512 user–movie positive pairs, each user is scored against all 512 movies at once (a 512×512 matrix), and the model learns to make the true pair stand out. The single most important line is the <strong>logQ correction</strong> — it subtracts <code>log(P(item))</code> from the logits to cancel the popularity bias that in-batch sampling introduces. Without it, the model literally loses to a 'just recommend popular films' baseline.",
+    role_:"At request time <code>recommend_for_user()</code> computes the user vector on the fly, dot-products it against all precomputed item vectors (<code>item_vecs.npy</code>), adds a small popularity prior, masks films the user already saw, and returns the top-k. This is the returning-user path.",
+    why:"The <strong>hybrid</strong> (two-tower + 0.30·log-popularity) scored Precision@10 = 0.094 vs 0.061 for popularity alone — <strong>+55% precision, +83% recall</strong>. Popularity is treated as a feature, not just a rival.",
+    fig:"twotower", related:["e5","qdrant","redis","rbm"],
+    kv:{ "Framework":"PyTorch", "Tower dim":"64", "Item input":"ID embed + 19 genre flags", "Negatives":"in-batch, temp 0.07", "Key trick":"logQ popularity correction" }
+  },
+  e5: {
+    ic:"🧭", name:"E5 Content Embeddings", layer:"l2", tool:"intfloat/e5-small-v2",
+    sub:"Turns a movie's words into a vector so 'find me something like this' works by meaning.",
+    what:"E5 is a pretrained text-embedding model. Feed it <code>title + genres</code> and it returns a unit-length vector that captures <strong>meaning</strong> — two thrillers land near each other even if they share no exact words. CineMind uses the <em>small</em> variant (e5-small-v2, ~130MB) deliberately, for laptop speed.",
+    how:"Offline, script 03 embeds every movie into <code>content_vecs.npy</code>. Online, <code>embedder.py</code> embeds the user's free-text query into the <em>same</em> vector space, and a cosine search returns the closest real movies. E5 needs a <code>query:</code> prefix for searches and <code>passage:</code> for documents — mixing them up quietly breaks similarity.",
+    role_:"This is the <strong>candidate generator for conversational search and cold-start onboarding</strong>. New users have no rating history, so the two-tower can't help them — content embeddings can, purely from what they describe.",
+    why:"It's also the grounding for RAG: because every candidate is a real embedded movie, the LLM downstream physically cannot hallucinate a title that doesn't exist.",
+    fig:"embed", related:["twotower","langchain","qdrant"],
+    kv:{ "Model":"intfloat/e5-small-v2", "Embeds":"title + genres", "Query prefix":"query: / passage:", "Search":"cosine over content_vecs", "Used by":"chat + onboarding" }
+  },
+  rbm: {
+    ic:"📊", name:"RBM Baseline", layer:"l2", tool:"src/02_rbm_baseline.py",
+    sub:"The number to beat — reproduced from the reference repo so the win is honest.",
+    what:"A Restricted Boltzmann Machine is the collaborative-filtering model from the reference project this work benchmarks against. It's an older neural approach to 'users who liked these will like those'.",
+    how:"Script 02 reproduces it on the exact same ml-100k split, giving a fair, apples-to-apples baseline: Precision@10 = 0.075.",
+    role_:"It exists purely as a <strong>yardstick</strong>. The whole point of the two-tower work is to beat a credible prior method — not just a trivial popularity list.",
+    why:"Reporting a model's score without a baseline is meaningless. The two-tower hybrid (0.094) beating both popularity (0.061) and the RBM (0.075) is what makes the result a real result.",
+    fig:"bench", related:["twotower","movielens"],
+    kv:{ "Method":"Restricted Boltzmann Machine", "Precision@10":"0.075", "Role":"baseline", "Beaten by":"two-tower hybrid (0.094)" }
+  },
+  qdrant: {
+    ic:"🧲", name:"Qdrant", layer:"l3", tool:"vector database",
+    sub:"Fast nearest-neighbour search over the collaborative movie vectors.",
+    what:"Qdrant is a <strong>vector database</strong> — it stores high-dimensional vectors and answers 'which vectors are closest to this one?' quickly (approximate nearest-neighbour, or ANN). CineMind loads the two-tower <em>item</em> vectors into a collection called <code>collab_vectors</code>.",
+    how:"Used by <code>similar_to_movie()</code> for the 'movies like X' feature. Notice a design detail: the <em>content</em> vectors are searched with plain numpy cosine, not Qdrant — Qdrant here holds the collaborative vectors specifically.",
+    role_:"Optional, like every store in this system. <code>recommender.py</code> auto-detects Qdrant on startup; if it's unreachable it <strong>falls back to a numpy dot-product</strong> over the same vectors. Same answers, just not as scalable.",
+    why:"On 1,682 movies numpy is instant, so Qdrant is really here to show the <em>production shape</em>: at millions of items you can't brute-force cosine, and this is where an ANN index earns its place.",
+    fig:"ann", related:["twotower","redis","neo4j"],
+    kv:{ "Type":"vector DB (ANN)", "Holds":"collab item vectors", "Collection":"collab_vectors", "Fallback":"numpy cosine", "Used by":"similar_to_movie()" }
+  },
+  neo4j: {
+    ic:"🕸️", name:"Neo4j", layer:"l3", tool:"graph database",
+    sub:"Real crowd behaviour as a graph — a genuinely different signal than the vectors.",
+    what:"Neo4j is a <strong>graph database</strong>. CineMind loads the ratings as a graph: <code>(User)-[:RATED]->(Movie)-[:HAS_GENRE]->(Genre)</code> — 55,375 RATED edges and 2,893 HAS_GENRE edges.",
+    how:"<code>graph.py</code> answers <code>/graph/insights/{movie_id}</code> with two traversals: <strong>co-raters</strong> ('other people who rated this ≥4 also rated these highly') and <strong>shared-genre</strong> movies. These are written in Cypher, Neo4j's query language.",
+    role_:"This answers a different question than the vector stores. Qdrant/two-tower find things <em>numerically</em> close to a vector; the graph finds things connected through <strong>actual other users' behaviour</strong> — e.g. Star Wars (id 50) correctly surfaces 501 raters and Return of the Jedi as a top co-liked film.",
+    why:"It gives the 'Graph insights' panel a fact, not a score: '501 users who rated this also rated…'. Optional — if Neo4j is down, the panel just hides.",
+    fig:"graph", related:["qdrant","postgres","react"],
+    kv:{ "Type":"graph DB", "Nodes":"User · Movie · Genre", "RATED edges":"55,375", "HAS_GENRE edges":"2,893", "Query lang":"Cypher" }
+  },
+  redis: {
+    ic:"⚡", name:"Redis", layer:"l3", tool:"in-memory cache",
+    sub:"Cache-aside so repeat recommendations return in ~1ms instead of ~24ms.",
+    what:"Redis is an in-memory key–value store used here as a <strong>cache</strong> for the returning-user recommendation path.",
+    how:"<code>recommend_for_user()</code> is cache-aside: it checks Redis for key <code>recs:{user_id}:{k}</code> first; on a miss it runs the model and writes the result back with a <strong>5-minute TTL</strong>. A real timing test showed ~24ms (miss) → ~1ms (hit), identical results — roughly a 24× speedup.",
+    role_:"The TTL is short on purpose: <code>POST /feedback</code> changes what a user has 'seen', and that should surface reasonably soon rather than being cached stale forever.",
+    why:"It's the difference between recomputing a model forward pass on every page refresh and serving the same answer nearly free. Optional — no Redis just means every call is freshly computed.",
+    fig:"cache", related:["twotower","postgres","fastapi"],
+    kv:{ "Type":"in-memory cache", "Pattern":"cache-aside", "Key":"recs:{user_id}:{k}", "TTL":"300s", "Speedup":"~24× on hit" }
+  },
+  postgres: {
+    ic:"🗄️", name:"PostgreSQL", layer:"l3", tool:"relational DB",
+    sub:"Durable home for feedback events — the raw material of the retraining loop.",
+    what:"Postgres is the relational database that stores <strong>feedback events</strong>: clicks, likes/skips, and ratings, each row tagged with user, movie, and timestamp.",
+    how:"<code>feedback.py</code> writes to Postgres when <code>POSTGRES_URL</code> is reachable; otherwise it <strong>falls back to a local SQLite file</strong> (<code>feedback.db</code>) so the API works with no Docker running at all.",
+    role_:"It closes the loop. Every thumbs-up/down the UI sends becomes a durable row that a future retraining run of the two-tower model can learn from.",
+    why:"Recommendations that never learn from reactions go stale. Persisting feedback is what makes the system improvable rather than frozen.",
+    fig:"feedback", related:["redis","react","twotower"],
+    kv:{ "Type":"relational DB", "Stores":"feedback (clicks/ratings)", "Fallback":"SQLite (feedback.db)", "Feeds":"retraining loop" }
+  },
+  langchain: {
+    ic:"🧠", name:"LangChain + LLM", layer:"l4", tool:"Claude / Groq · llm_chains.py",
+    sub:"Parses requests, re-ranks candidates, and writes the 'Why this?' explanation.",
+    what:"The reasoning layer. LangChain orchestrates four LLM chains over whichever provider has a key — <strong>Anthropic Claude</strong> (preferred) or <strong>Groq Llama</strong> (free tier). The same chains run on either, unchanged.",
+    how:"For conversational search the flow is <strong>parse → retrieve → re-rank → explain</strong>: Haiku parses the free-text query into a JSON intent, E5 retrieves ~30 real candidates, Sonnet re-ranks them to a final 10 (choosing <em>only</em> from the candidate list), and Haiku writes a 1–2 sentence explanation grounded in real genres and plot.",
+    role_:"Every chain follows the <strong>RAG pattern</strong>: the model may only reason over movies retrieval actually found, so it can't invent a title or ID. Free-tier models sometimes repeat an ID, so the code de-duplicates while preserving rank.",
+    why:"This is what makes CineMind <em>conversational and explainable</em> rather than just a ranked list. And it degrades gracefully — with no API key, callers get clean retrieval-only results instead of a crash.",
+    fig:"llm", related:["e5","langfuse","fastapi"],
+    kv:{ "Orchestrator":"LangChain (LCEL)", "Providers":"Anthropic → Groq", "Chains":"parse · rerank · explain · onboard", "Pattern":"RAG (grounded)", "No key?":"retrieval-only fallback" }
+  },
+  langfuse: {
+    ic:"🔬", name:"Langfuse", layer:"l4", tool:"LLM observability",
+    sub:"Traces every LLM call — cost, latency, inputs, outputs — for debugging.",
+    what:"Langfuse is an observability layer for LLM apps. It records each chain invocation as a <strong>trace</strong>: which prompt ran, what came back, how long it took, and what it cost.",
+    how:"<code>_invoke_or_none()</code> in <code>llm_chains.py</code> attaches a Langfuse <code>CallbackHandler</code> to every <code>.invoke()</code> when <code>LANGFUSE_PUBLIC_KEY/SECRET_KEY</code> are set. It was verified end-to-end by confirming — via Langfuse's own public API — that a real trace actually landed on their servers.",
+    role_:"It's the flight recorder for the reasoning layer. When a re-rank returns something odd, the trace shows exactly what the model saw and said.",
+    why:"LLM behaviour is non-deterministic and easy to get quietly wrong. Tracing turns 'it feels off' into a concrete, inspectable record. Optional — unset keys mean it silently does nothing.",
+    fig:"trace", related:["langchain"],
+    kv:{ "Type":"LLM observability", "Captures":"cost · latency · I/O", "Hook":"CallbackHandler per invoke", "Host":"cloud.langfuse.com", "Optional?":"yes" }
+  },
+  fastapi: {
+    ic:"🚀", name:"FastAPI Backend", layer:"l5", tool:"backend/main.py",
+    sub:"Seven HTTP routes that wire the whole pipeline together for the web.",
+    what:"FastAPI is the web framework exposing the pipeline over HTTP. On startup it loads the model, artifacts and graph once, then serves <strong>seven routes</strong>.",
+    how:"<code>/recommendations/{id}</code> (Redis-cached returning-user path), <code>/chat</code> (conversational search), <code>/onboarding</code> (cold-start), <code>/feedback</code> (log a reaction), <code>/explain/{id}</code>, <code>/graph/insights/{id}</code>, and <code>/health</code> (which reports the live LLM provider, cache, graph and feedback backend).",
+    role_:"It's the seam between the ML/data world and the browser. CORS is enabled for the Vite dev origin so the React app can call it.",
+    why:"Plain JSON responses, graceful fallbacks baked into every dependency — the API stays up and useful even when Qdrant, Redis, Neo4j, Postgres, or the LLM are all absent.",
+    fig:"api", related:["react","langchain","redis","docker"],
+    kv:{ "Framework":"FastAPI", "Routes":"7", "Startup":"load model + graph once", "CORS":"Vite origin", "Responses":"plain JSON" }
+  },
+  docker: {
+    ic:"🐳", name:"Docker", layer:"l5", tool:"docker-compose · Dockerfile.render",
+    sub:"Packages the app + its 5 services so it runs the same everywhere.",
+    what:"Docker packages an app with everything it needs into a <strong>container</strong> that runs identically on any machine. A <code>Dockerfile</code> is the blueprint; <code>docker-compose</code> runs several containers together as one stack.",
+    how:"<code>docker-compose.yml</code> boots the whole local stack with one command: the <strong>API + Qdrant + Postgres + Redis + Neo4j</strong>, networked together by service name. Separately, <code>Dockerfile.render</code> is a single-service image for deploying to Render — it bakes in <code>data/</code> + <code>artifacts/</code> (Render's free tier has no volumes) and runs <em>without</em> the sidecar databases, leaning on the same graceful fallbacks.",
+    role_:"Reproducibility and one-command infra. Instead of hand-installing five databases, you run <code>docker compose up</code>. The Render image proves the app can also run lean, as a single process.",
+    why:"'Works on my machine' stops being a risk — the same image runs for you, a recruiter cloning the repo, or a deploy target. The trade-off is real RAM/CPU: five containers is heavy on a laptop.",
+    fig:"docker", related:["fastapi","qdrant","neo4j","redis","postgres"],
+    kv:{ "Local stack":"API+Qdrant+Postgres+Redis+Neo4j", "Deploy image":"Dockerfile.render (single service)", "Networking":"by service name", "Trade-off":"reproducible but RAM-heavy" }
+  },
+  react: {
+    ic:"⚛️", name:"React Frontend", layer:"l6", tool:"Vite + react-router",
+    sub:"The full product UI: cards, chat, onboarding, watchlist, graph panels.",
+    what:"The primary interface — a React single-page app (Vite build, react-router) with a cinematic dark/light theme: Bebas Neue display, Inter body, the marquee-red accent.",
+    how:"Recommendation cards carry poster, score, genres, cast, a 'Why this?' panel and a 'Graph insights' panel. There's a conversational chat search, a cold-start onboarding wizard, a localStorage-backed watchlist, a genre filter, a movie detail modal, skeleton loaders, and a live API health badge.",
+    role_:"It's the face of the whole system — every backend route shows up here as something a person can click. It talks to FastAPI via a small fetch client (<code>api.js</code>).",
+    why:"This is the 'real product' track: full navigation, persistence and polish, deployed to Vercel. The Streamlit app is the lightweight sibling.",
+    fig:"ui", related:["fastapi","streamlit","omdb","neo4j"],
+    kv:{ "Stack":"React + Vite + react-router", "Deploy":"Vercel", "Talks to":"FastAPI (api.js)", "Theme":"Bebas Neue / Inter / marquee-red" }
+  },
+  streamlit: {
+    ic:"🎈", name:"Streamlit Demo", layer:"l6", tool:"streamlit_app/app.py",
+    sub:"A lightweight public demo that skips the API hop entirely.",
+    what:"A single-page Streamlit app for public/portfolio access — no need to host React + FastAPI + Docker just to show the system off.",
+    how:"It imports <code>recommender.py</code>, <code>llm_chains.py</code> and <code>graph.py</code> <strong>directly</strong> (no HTTP hop) and uses <code>st.session_state</code> to keep results across reruns, plus local <code>st.cache_data</code> so it works without a Redis sidecar. It has the returning-user, conversational-search, new-user and watchlist tabs, with a shared genre filter.",
+    role_:"Same engine, simpler skin. It matches the React theme (same marquee-red, near-black ground) so the two read as one product.",
+    why:"Because Streamlit reruns the whole script on every click, session_state is essential — without it, clicking any per-card button would make the whole result list vanish. It deploys free to Streamlit Community Cloud.",
+    fig:"streamlit", related:["react","langchain","redis"],
+    kv:{ "Framework":"Streamlit", "Calls":"recommender/llm/graph directly", "State":"st.session_state + cache_data", "Deploy":"Streamlit Community Cloud" }
+  },
+};
+
+/* ------------------------------------------------------------------ *
+ *  RENDER: map                                                        *
+ * ------------------------------------------------------------------ */
+function lc(layer){ return `var(--${layer})`; }
+function lbg(layer){ return `var(--${layer}-bg)`; }
+
+function buildLegend(){
+  const el = document.getElementById("legend");
+  el.innerHTML = LAYERS.map(l =>
+    `<span class="li"><span class="sw" style="background:${lc(l.id)}"></span>${l.tag} · ${l.name}</span>`
+  ).join("");
+}
+
+function buildMap(){
+  const host = document.getElementById("layers");
+  host.innerHTML = LAYERS.map((l, i) => {
+    const cards = l.comps.map(id => {
+      const c = C[id];
+      return `<button class="comp" style="--lc:${lc(l.id)}" onclick="openDetail('${id}')" aria-label="${c.name}">
+        <span class="ic">${c.ic}</span>
+        <span class="cn">${c.name}</span>
+        <span class="ct">${c.sub}</span>
+        <span class="tool">${c.tool}</span>
+      </button>`;
+    }).join("");
+    const bar = i < LAYERS.length-1 ? flowConnector() : "";
+    return `<section class="layer" style="--lc:${lc(l.id)};--lbg:${lbg(l.id)}">
+      <div class="layer-head">
+        <span class="layer-tag" style="--lc:${lc(l.id)}">${l.tag}</span>
+        <span class="layer-name">${l.name}</span>
+        <span class="layer-role">${l.role}</span>
+      </div>
+      <div class="comp-grid">${cards}</div>
+    </section>${bar}`;
+  }).join("");
+}
+function flowConnector(){
+  return `<div class="flowbar"><svg width="30" height="26" viewBox="0 0 30 26">
+    <line x1="15" y1="0" x2="15" y2="18" stroke="var(--line-strong)" stroke-width="2"/>
+    <path d="M15 26 L9 16 L21 16 Z" fill="var(--line-strong)"/></svg></div>`;
+}
+
+/* ------------------------------------------------------------------ *
+ *  RENDER: detail                                                     *
+ * ------------------------------------------------------------------ */
+function openDetail(id){
+  const c = C[id];
+  const view = document.getElementById("detailView");
+  const kv = Object.entries(c.kv).map(([k,v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+  const related = c.related.map(r => `<button class="chip" onclick="openDetail('${r}')">${C[r].ic} ${C[r].name}</button>`).join("");
+
+  view.innerHTML = `
+    <button class="back" onclick="showMap()">← All components</button>
+    <div class="dhead" style="--lc:${lc(c.layer)};--lbg:${lbg(c.layer)}">
+      <div class="dic">${c.ic}</div>
+      <div>
+        <h2>${c.name}</h2>
+        <div class="dsub">${c.sub}</div>
+        <span class="dtool" style="--lc:${lc(c.layer)}">${c.tool}</span>
+      </div>
+    </div>
+
+    <div class="dcols">
+      <div class="left">
+        <div class="card" style="--lc:${lc(c.layer)}">
+          <h3>What it is</h3><p class="q">${c.what}</p>
+        </div>
+        <div class="card" style="--lc:${lc(c.layer)}">
+          <h3>How it works</h3><p class="q">${c.how}</p>
+        </div>
+        <div class="card" style="--lc:${lc(c.layer)}">
+          <h3>What it does in CineMind</h3><p class="q">${c.role_}</p>
+        </div>
+        <div class="card" style="--lc:${lc(c.layer)}">
+          <h3>Why it matters</h3><p class="q">${c.why}</p>
+        </div>
+      </div>
+      <div class="right">
+        <div class="figure" style="--lc:${lc(c.layer)}">
+          <div class="ftitle">Interactive · ${c.name}</div>
+          <div class="figstage" id="figstage"></div>
+          <div class="fnote" id="fnote"></div>
+          <div class="btnrow" id="figbtns"></div>
+        </div>
+        <div class="card" style="--lc:${lc(c.layer)}">
+          <h3>At a glance</h3><dl class="kv">${kv}</dl>
+        </div>
+        <div class="card" style="--lc:${lc(c.layer)}">
+          <h3>Connects to</h3><div class="related">${related}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer"><span>${c.name}</span><span>CineMind Architecture Explorer</span></div>
+  `;
+
+  document.getElementById("crumbs").innerHTML = `<b>${c.name}</b> — ${c.tool}`;
+  document.getElementById("mapView").classList.add("hidden");
+  view.classList.add("active");
+  window.scrollTo({top:0, behavior:"instant"});
+  if (FIGS[c.fig]) FIGS[c.fig](document.getElementById("figstage"),
+                              document.getElementById("fnote"),
+                              document.getElementById("figbtns"));
+  location.hash = id;
+}
+
+function showMap(){
+  document.getElementById("detailView").classList.remove("active");
+  document.getElementById("mapView").classList.remove("hidden");
+  document.getElementById("crumbs").innerHTML = `<b>System map</b> — click any component`;
+  if (location.hash) history.replaceState(null,"", location.pathname);
+  window.scrollTo({top:0, behavior:"instant"});
+}
+
+/* ------------------------------------------------------------------ *
+ *  INTERACTIVE FIGURES (canvas / svg mini-explainers)                 *
+ *  Each: (stage, note, btns) -> renders + wires small animations      *
+ * ------------------------------------------------------------------ */
+const FIGS = {};
+const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function makeCanvas(stage, h){
+  stage.innerHTML = "";
+  const c = document.createElement("canvas");
+  const w = stage.clientWidth || 360;
+  const dpr = Math.min(window.devicePixelRatio||1, 2);
+  c.width = w*dpr; c.height = h*dpr; c.style.width="100%"; c.style.height=h+"px";
+  const ctx = c.getContext("2d"); ctx.scale(dpr,dpr);
+  stage.appendChild(c);
+  return {c, ctx, w, h};
+}
+function btn(host, label, fn, primary){
+  const b = document.createElement("button");
+  b.className = "fbtn"+(primary?" primary":""); b.textContent = label; b.onclick = fn;
+  host.appendChild(b); return b;
+}
+
+/* --- Two-tower: two networks -> dot product score --- */
+FIGS.twotower = (stage, note, btns) => {
+  const {ctx, w, h} = makeCanvas(stage, 250);
+  let t = 0, raf, running = true;
+  const draw = () => {
+    const ink=cssv("--ink"), acc=cssv("--accent"), l2=cssv("--l2"), teal=cssv("--teal"), faint=cssv("--faint");
+    ctx.clearRect(0,0,w,h);
+    const uX=w*0.16, iX=w*0.84, midX=w/2;
+    // towers
+    const drawTower=(x,label,col,seed)=>{
+      ctx.fillStyle=col; ctx.font="600 12px "+cssv("--font-body");
+      ctx.textAlign="center"; ctx.fillText(label, x, 20);
+      for(let layer=0; layer<3; layer++){
+        const n = [3,4,2][layer]; const ly = 44+layer*46;
+        for(let k=0;k<n;k++){
+          const nx = x-(n-1)*11+k*22;
+          if(layer<2){ const n2=[3,4,2][layer+1];
+            for(let j=0;j<n2;j++){ const nx2=x-(n2-1)*11+j*22, ny2=44+(layer+1)*46;
+              ctx.strokeStyle=col+"33"; ctx.lineWidth=1; ctx.beginPath();
+              ctx.moveTo(nx,ly); ctx.lineTo(nx2,ny2); ctx.stroke(); } }
+          const pulse = 0.5+0.5*Math.sin(t*0.05+seed+k+layer);
+          ctx.fillStyle=col; ctx.globalAlpha=0.35+0.55*pulse;
+          ctx.beginPath(); ctx.arc(nx,ly,5,0,7); ctx.fill(); ctx.globalAlpha=1;
+        }
+      }
+      // output vector
+      ctx.fillStyle=faint; ctx.font="10px "+cssv("--font-mono");
+      ctx.fillText("64-d vector", x, 190);
+      for(let k=0;k<8;k++){ const bx=x-40+k*10; const bh=6+16*(0.5+0.5*Math.sin(t*0.05+seed+k));
+        ctx.fillStyle=col; ctx.fillRect(bx, 205-bh, 7, bh); }
+    };
+    drawTower(uX,"USER tower",l2,0);
+    drawTower(iX,"ITEM tower",teal,10);
+    // dot-product node
+    const glow=0.5+0.5*Math.sin(t*0.05);
+    ctx.strokeStyle=acc+"66"; ctx.lineWidth=2; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(uX+45,200); ctx.lineTo(midX-24,h/2+40); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(iX-45,200); ctx.lineTo(midX+24,h/2+40); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle=acc; ctx.globalAlpha=0.15+0.2*glow;
+    ctx.beginPath(); ctx.arc(midX,h/2+40,30+4*glow,0,7); ctx.fill(); ctx.globalAlpha=1;
+    ctx.fillStyle=acc; ctx.beginPath(); ctx.arc(midX,h/2+40,20,0,7); ctx.fill();
+    ctx.fillStyle="#fff"; ctx.font="700 15px "+cssv("--font-mono"); ctx.textAlign="center";
+    ctx.fillText("·", midX, h/2+46);
+    ctx.fillStyle=ink; ctx.font="600 11px "+cssv("--font-body");
+    ctx.fillText("dot product", midX, h/2+82);
+    ctx.fillStyle=acc; ctx.font="700 13px "+cssv("--font-mono");
+    ctx.fillText("score "+(0.5+0.49*glow).toFixed(2), midX, h/2+100);
+    if(running){ t++; raf=requestAnimationFrame(draw); }
+  };
+  draw();
+  note.textContent = "Each tower compresses its input to a 64-number vector; the dot product of the two is the predicted match score.";
+  btn(btns, "⏸ Pause", (e)=>{ running=!running; e.target.textContent=running?"⏸ Pause":"▶ Play"; if(running) draw(); }, true);
+  stage._stop = () => { running=false; cancelAnimationFrame(raf); };
+};
+
+/* --- logQ / benchmark bars --- */
+FIGS.bench = (stage, note, btns) => {
+  const data=[["Popularity",0.061],["RBM",0.075],["Two-tower",0.058],["+ pop prior",0.094]];
+  renderBars(stage, note, btns, data, "Precision@10 — the hybrid (last bar) wins.");
+};
+function renderBars(stage, note, btns, data, msg){
+  const {ctx,w,h}=makeCanvas(stage,220);
+  const max=Math.max(...data.map(d=>d[1]))*1.15;
+  let p=0, raf;
+  const draw=()=>{
+    ctx.clearRect(0,0,w,h);
+    const acc=cssv("--accent"), muted=cssv("--muted"), faint=cssv("--faint"), line=cssv("--line");
+    const bw=(w-40)/data.length, base=h-38;
+    ctx.strokeStyle=line; ctx.beginPath(); ctx.moveTo(20,base); ctx.lineTo(w-20,base); ctx.stroke();
+    data.forEach((d,i)=>{
+      const x=24+i*bw, bh=(d[1]/max)*(base-16)*p;
+      const win = i===data.length-1;
+      ctx.fillStyle= win?acc:muted; ctx.globalAlpha= win?1:0.55;
+      ctx.fillRect(x, base-bh, bw-16, bh); ctx.globalAlpha=1;
+      ctx.fillStyle=faint; ctx.font="10px "+cssv("--font-body"); ctx.textAlign="center";
+      ctx.fillText(d[0], x+(bw-16)/2, base+14);
+      if(p>0.9){ ctx.fillStyle= win?acc:muted; ctx.font="700 11px "+cssv("--font-mono");
+        ctx.fillText(d[1].toFixed(3), x+(bw-16)/2, base-bh-6); }
+    });
+    if(p<1){ p+=0.03; raf=requestAnimationFrame(draw); }
+  };
+  draw();
+  note.textContent = msg;
+  btn(btns,"↻ Replay", ()=>{ p=0; cancelAnimationFrame(raf); draw(); }, true);
+  stage._stop=()=>cancelAnimationFrame(raf);
+};
+
+/* --- temporal split --- */
+FIGS.split = (stage, note, btns) => {
+  const {ctx,w,h}=makeCanvas(stage,180);
+  let p=0, raf;
+  const draw=()=>{
+    ctx.clearRect(0,0,w,h);
+    const l1=cssv("--l1"), acc=cssv("--accent"), faint=cssv("--faint"), ink=cssv("--ink");
+    ctx.fillStyle=ink; ctx.font="600 12px "+cssv("--font-body"); ctx.textAlign="left";
+    ctx.fillText("One user's ratings, oldest → newest", 12, 22);
+    const n=24, x0=14, x1=w-14, y=70, r=6;
+    const cut=Math.floor(n*0.8);
+    for(let i=0;i<n;i++){
+      const x=x0+(x1-x0)*(i/(n-1)); const on = i/n <= p;
+      const test = i>=cut;
+      ctx.globalAlpha=on?1:0.12;
+      ctx.fillStyle= test?acc:l1;
+      ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.fill();
+      ctx.globalAlpha=1;
+    }
+    // brackets
+    ctx.strokeStyle=l1; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(x0, y+20); ctx.lineTo(x0+(x1-x0)*(cut-0.5)/(n-1), y+20); ctx.stroke();
+    ctx.fillStyle=l1; ctx.font="600 11px "+cssv("--font-body"); ctx.textAlign="center";
+    ctx.fillText("TRAIN (first 80%)", x0+(x1-x0)*0.4, y+38);
+    ctx.strokeStyle=acc; ctx.beginPath();
+    ctx.moveTo(x0+(x1-x0)*(cut-0.5)/(n-1), y+20); ctx.lineTo(x1, y+20); ctx.stroke();
+    ctx.fillStyle=acc; ctx.fillText("TEST (last 20%)", x0+(x1-x0)*0.9, y+38);
+    if(p<1){ p+=0.02; raf=requestAnimationFrame(draw); }
+  };
+  draw();
+  note.textContent="Split by time, not at random — the model is only ever tested on ratings that came after everything it trained on. No future leakage.";
+  btn(btns,"↻ Replay",()=>{p=0;cancelAnimationFrame(raf);draw();},true);
+  stage._stop=()=>cancelAnimationFrame(raf);
+};
+
+/* --- embedding space --- */
+FIGS.embed = (stage, note, btns) => {
+  const {ctx,w,h}=makeCanvas(stage,240);
+  const pts=[]; const clusters=[[0.28,0.34,"--l1","Sci-Fi"],[0.7,0.3,"--teal","Comedy"],[0.5,0.72,"--l6","Thriller"]];
+  clusters.forEach(([cx,cy,col],ci)=>{ for(let i=0;i<9;i++){
+    pts.push({x:cx+(Math.random()-0.5)*0.22, y:cy+(Math.random()-0.5)*0.22, col, ci}); }});
+  let query=null, raf, tt=0;
+  const draw=()=>{
+    ctx.clearRect(0,0,w,h);
+    const faint=cssv("--faint"), acc=cssv("--accent"), ink=cssv("--ink");
+    ctx.strokeStyle=cssv("--line"); ctx.lineWidth=1;
+    for(let g=0.1; g<1; g+=0.18){ ctx.globalAlpha=0.5;
+      ctx.beginPath(); ctx.moveTo(g*w,10); ctx.lineTo(g*w,h-10); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(10,g*h); ctx.lineTo(w-10,g*h); ctx.stroke(); ctx.globalAlpha=1; }
+    if(query){ // connect nearest 5
+      const withD=pts.map(pt=>({pt,d:Math.hypot(pt.x-query.x,pt.y-query.y)})).sort((a,b)=>a.d-b.d).slice(0,5);
+      withD.forEach(({pt})=>{ ctx.strokeStyle=acc; ctx.globalAlpha=0.4; ctx.lineWidth=1.5;
+        ctx.beginPath(); ctx.moveTo(query.x*w,query.y*h); ctx.lineTo(pt.x*w,pt.y*h); ctx.stroke(); ctx.globalAlpha=1; });
+    }
+    pts.forEach(pt=>{ ctx.fillStyle=cssv(pt.col); ctx.beginPath(); ctx.arc(pt.x*w,pt.y*h,5,0,7); ctx.fill(); });
+    if(query){ const pl=0.5+0.5*Math.sin(tt*0.1);
+      ctx.fillStyle=acc; ctx.globalAlpha=0.2+0.2*pl; ctx.beginPath(); ctx.arc(query.x*w,query.y*h,14+3*pl,0,7); ctx.fill(); ctx.globalAlpha=1;
+      ctx.fillStyle=acc; ctx.beginPath(); ctx.arc(query.x*w,query.y*h,7,0,7); ctx.fill();
+      ctx.fillStyle="#fff"; ctx.font="700 9px "+cssv("--font-mono"); ctx.textAlign="center"; ctx.fillText("q", query.x*w, query.y*h+3);
+    }
+    ctx.fillStyle=faint; ctx.font="10px "+cssv("--font-body"); ctx.textAlign="left";
+    ctx.fillText("each dot = a movie · nearby = similar meaning", 10, h-6);
+    tt++; raf=requestAnimationFrame(draw);
+  };
+  draw();
+  note.textContent="Click anywhere to drop a query. E5 embeds it into the same space; cosine search lights up its nearest real movies.";
+  stage.querySelector("canvas").style.cursor="crosshair";
+  stage.querySelector("canvas").onclick=(e)=>{ const rect=e.target.getBoundingClientRect();
+    query={x:(e.clientX-rect.left)/rect.width, y:(e.clientY-rect.top)/rect.height};
+    note.textContent="Query dropped — the 5 nearest movies are linked. Those become the RAG candidates the LLM re-ranks."; };
+  btn(btns,"✦ Random query",()=>{ query={x:0.2+Math.random()*0.6,y:0.2+Math.random()*0.6};
+    note.textContent="The 5 nearest movies are the grounded candidates — the LLM can only pick from real, retrieved films."; },true);
+  stage._stop=()=>cancelAnimationFrame(raf);
+};
+
+/* --- ANN vs numpy --- */
+FIGS.ann = (stage, note, btns) => {
+  const {ctx,w,h}=makeCanvas(stage,220);
+  const pts=Array.from({length:60},()=>({x:Math.random(),y:Math.random()}));
+  const q={x:0.5,y:0.5}; let mode="ann", step=0, raf;
+  const draw=()=>{
+    ctx.clearRect(0,0,w,h);
+    const acc=cssv("--accent"), l3=cssv("--l3"), faint=cssv("--faint");
+    const withD=pts.map((p,i)=>({p,i,d:Math.hypot(p.x-q.x,p.y-q.y)})).sort((a,b)=>a.d-b.d);
+    const scanned = mode==="numpy" ? Math.min(step, pts.length) : Math.min(step,8);
+    pts.forEach((p)=>{ ctx.fillStyle=faint; ctx.globalAlpha=0.4; ctx.beginPath(); ctx.arc(p.x*w,p.y*h,4,0,7); ctx.fill(); ctx.globalAlpha=1; });
+    if(mode==="numpy"){ withD.slice(0,scanned).forEach(({p})=>{ ctx.strokeStyle=faint; ctx.globalAlpha=0.5;
+      ctx.beginPath(); ctx.moveTo(q.x*w,q.y*h); ctx.lineTo(p.x*w,p.y*h); ctx.stroke(); ctx.globalAlpha=1; }); }
+    withD.slice(0, Math.min(scanned,5)).forEach(({p},k)=>{ if(k<5){ ctx.fillStyle=l3; ctx.beginPath(); ctx.arc(p.x*w,p.y*h,6,0,7); ctx.fill(); } });
+    ctx.fillStyle=acc; ctx.beginPath(); ctx.arc(q.x*w,q.y*h,8,0,7); ctx.fill();
+    ctx.fillStyle="#fff"; ctx.font="700 9px "+cssv("--font-mono"); ctx.textAlign="center"; ctx.fillText("X",q.x*w,q.y*h+3);
+    ctx.fillStyle=faint; ctx.font="600 11px "+cssv("--font-mono"); ctx.textAlign="left";
+    ctx.fillText(mode==="numpy"?`numpy: compared ${scanned}/60`:`ANN: jumped to top ${Math.min(scanned,5)}`, 10, 16);
+    if(step < (mode==="numpy"?pts.length:8)){ step+=mode==="numpy"?2:1; raf=requestAnimationFrame(draw); }
+  };
+  const run=(m)=>{ mode=m; step=0; cancelAnimationFrame(raf); draw(); };
+  run("ann");
+  note.textContent="Both find the 5 nearest movies (green). numpy compares against every point; an ANN index jumps almost straight there — the difference that matters at millions of items.";
+  btn(btns,"⚡ ANN (Qdrant)",()=>{ run("ann"); note.textContent="Qdrant's ANN index skips the brute-force scan — near-instant even on huge catalogues."; },true);
+  btn(btns,"🐢 numpy scan",()=>{ run("numpy"); note.textContent="The fallback compares the query to every movie. Fine for 1,682; impossible for millions."; });
+  stage._stop=()=>cancelAnimationFrame(raf);
+};
+
+/* --- graph traversal --- */
+FIGS.graph = (stage, note, btns) => {
+  const {ctx,w,h}=makeCanvas(stage,250);
+  const movie={x:w/2,y:h/2,label:"Movie 50"};
+  const users=Array.from({length:6},(_,i)=>({a:Math.PI*2*i/6, r:70}));
+  const others=Array.from({length:5},(_,i)=>({a:Math.PI*2*i/5-0.3, r:118}));
+  let step=0, raf, running=true;
+  const draw=()=>{
+    ctx.clearRect(0,0,w,h);
+    const l3=cssv("--l3"), acc=cssv("--accent"), l1=cssv("--l1"), faint=cssv("--faint");
+    const uPos=users.map(u=>({x:movie.x+Math.cos(u.a)*u.r, y:movie.y+Math.sin(u.a)*u.r}));
+    const oPos=others.map(o=>({x:movie.x+Math.cos(o.a)*o.r, y:movie.y+Math.sin(o.a)*o.r}));
+    // edges movie-user (step>=1)
+    if(step>=1) uPos.forEach((u,i)=>{ ctx.strokeStyle=l3; ctx.globalAlpha=Math.min(1,(step-1)*0.5); ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(movie.x,movie.y); ctx.lineTo(u.x,u.y); ctx.stroke(); ctx.globalAlpha=1; });
+    // edges user-other (step>=2)
+    if(step>=2) uPos.forEach((u)=>{ oPos.forEach((o,j)=>{ if((j+u.x)%2<1){ ctx.strokeStyle=acc; ctx.globalAlpha=0.25;
+      ctx.beginPath(); ctx.moveTo(u.x,u.y); ctx.lineTo(o.x,o.y); ctx.stroke(); ctx.globalAlpha=1; } }); });
+    if(step>=2) oPos.forEach(o=>{ ctx.fillStyle=acc; ctx.beginPath(); ctx.arc(o.x,o.y,9,0,7); ctx.fill();
+      ctx.fillStyle="#fff"; ctx.font="9px "+cssv("--font-body"); ctx.textAlign="center"; ctx.fillText("also", o.x,o.y+3); });
+    uPos.forEach(u=>{ ctx.fillStyle=l1; ctx.beginPath(); ctx.arc(u.x,u.y,8,0,7); ctx.fill();
+      ctx.fillStyle="#fff"; ctx.font="9px "+cssv("--font-body"); ctx.textAlign="center"; ctx.fillText("👤",u.x,u.y+3); });
+    ctx.fillStyle=l3; ctx.beginPath(); ctx.arc(movie.x,movie.y,18,0,7); ctx.fill();
+    ctx.fillStyle="#fff"; ctx.font="700 10px "+cssv("--font-body"); ctx.textAlign="center"; ctx.fillText("🎬",movie.x,movie.y+4);
+    ctx.fillStyle=faint; ctx.font="10px "+cssv("--font-body");
+    const cap=["","RATED by these users…","…who also RATED these highly (co-liked)"][Math.min(step,2)];
+    ctx.textAlign="center"; ctx.fillText(cap, w/2, h-8);
+    if(running && step<2 && Math.random()<0.02) step++;
+    raf=requestAnimationFrame(draw);
+  };
+  draw();
+  note.textContent="A graph query, not a similarity score: start at a movie, hop to its raters, hop again to what THEY liked. That's the 'also liked by the same raters' list.";
+  btn(btns,"▶ Traverse",()=>{ step=0; running=true; const iv=setInterval(()=>{ step++; if(step>=2) clearInterval(iv); }, 900); },true);
+  stage._stop=()=>{ running=false; cancelAnimationFrame(raf); };
+};
+
+/* --- redis cache-aside --- */
+FIGS.cache = (stage, note, btns) => {
+  stage.innerHTML="";
+  const box=document.createElement("div"); box.style.cssText="font-family:"+cssv("--font-mono")+";font-size:12px";
+  stage.appendChild(box);
+  const log=document.createElement("div"); log.style.cssText="min-height:120px";
+  box.appendChild(log);
+  const line=(t,ms,hit)=>{ const d=document.createElement("div");
+    d.style.cssText="padding:6px 10px;margin:5px 0;border-radius:8px;border:1px solid var(--line);background:var(--panel-2);display:flex;justify-content:space-between";
+    d.innerHTML=`<span>${t}</span><span style="color:${hit?'var(--teal)':'var(--accent)'};font-weight:700">${ms}</span>`;
+    log.appendChild(d); };
+  let n=0;
+  const req=()=>{ n++;
+    if(n===1){ line("request #1 · MISS → run model → cache","~24 ms",false);
+      note.textContent="First call: nothing cached, so the model runs and the result is stored under recs:{user}:{k}."; }
+    else { line("request #"+n+" · HIT → served from Redis","~1 ms",true);
+      note.textContent="Repeat calls within the 5-min TTL skip the model entirely — ~24× faster, identical result."; } };
+  req();
+  btn(btns,"↻ Request again",req,true);
+  btn(btns,"🗑 Expire TTL",()=>{ n=0; log.innerHTML=""; note.textContent="TTL expired (or feedback changed 'seen') — next call is a fresh MISS again."; },false);
+};
+
+/* --- feedback loop --- */
+FIGS.feedback = (stage, note, btns) => {
+  const {ctx,w,h}=makeCanvas(stage,210);
+  const nodes=[["👍 UI reaction",0.16,0.3],["FastAPI /feedback",0.5,0.16],["Postgres / SQLite",0.84,0.5],["retrain two-tower",0.5,0.84]];
+  let t=0, raf;
+  const draw=()=>{
+    ctx.clearRect(0,0,w,h);
+    const acc=cssv("--accent"), ink=cssv("--ink"), l5=cssv("--l5"), l3=cssv("--l3");
+    const P=nodes.map(n=>({x:n[1]*w,y:n[2]*h,label:n[0]}));
+    for(let i=0;i<P.length;i++){ const a=P[i], b=P[(i+1)%P.length];
+      ctx.strokeStyle=cssv("--line-strong"); ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+      const tp=(t*0.01+i*0.25)%1; const px=a.x+(b.x-a.x)*tp, py=a.y+(b.y-a.y)*tp;
+      ctx.fillStyle=acc; ctx.beginPath(); ctx.arc(px,py,4,0,7); ctx.fill(); }
+    P.forEach((p,i)=>{ ctx.fillStyle=[l5,l5,l3,acc][i]; ctx.globalAlpha=0.16; ctx.beginPath(); ctx.roundRect(p.x-58,p.y-16,116,32,8); ctx.fill(); ctx.globalAlpha=1;
+      ctx.strokeStyle=[l5,l5,l3,acc][i]; ctx.lineWidth=1.5; ctx.beginPath(); ctx.roundRect(p.x-58,p.y-16,116,32,8); ctx.stroke();
+      ctx.fillStyle=ink; ctx.font="600 11px "+cssv("--font-body"); ctx.textAlign="center"; ctx.fillText(p.label,p.x,p.y+4); });
+    t++; raf=requestAnimationFrame(draw);
+  };
+  draw();
+  note.textContent="Every thumbs-up/down becomes a durable row, which a future retraining run folds back into the model. The loop is what keeps recommendations from going stale.";
+  stage._stop=()=>cancelAnimationFrame(raf);
+};
+
+/* --- LLM parse->retrieve->rerank->explain --- */
+FIGS.llm = (stage, note, btns) => {
+  stage.innerHTML="";
+  const steps=[
+    ["1 · Parse","Haiku → JSON intent",'{"search_text":"smart funny sci-fi","mood":"upbeat"}'],
+    ["2 · Retrieve","E5 cosine → 30 real movies","#50 Star Wars · #172 Empire · #181 …"],
+    ["3 · Re-rank","Sonnet picks from candidates only","[181, 50, 172, 96, …]"],
+    ["4 · Explain","Haiku grounds a reason","“Clever, upbeat sci-fi with heart — matches your ask.”"],
+  ];
+  const wrap=document.createElement("div"); wrap.style.cssText="display:flex;flex-direction:column;gap:8px";
+  stage.appendChild(wrap);
+  steps.forEach((s,i)=>{ const d=document.createElement("div"); d.className="llmstep"; d.style.cssText=
+    "opacity:.25;transform:translateX(-6px);transition:all .4s;border:1px solid var(--line);border-left:3px solid var(--l4);border-radius:9px;padding:9px 12px;background:var(--panel-2)";
+    d.innerHTML=`<div style="font-weight:700;font-size:12.5px">${s[0]} <span style="color:var(--muted);font-weight:500">— ${s[1]}</span></div>
+      <div style="font-family:${cssv('--font-mono')};font-size:11px;color:var(--l4);margin-top:3px">${s[2]}</div>`;
+    wrap.appendChild(d); });
+  const play=()=>{ const els=wrap.querySelectorAll(".llmstep"); els.forEach((e,i)=>setTimeout(()=>{ e.style.opacity=1; e.style.transform="none"; },i*550)); };
+  play();
+  note.textContent="Watch the RAG chain run: parse the request, retrieve real movies, re-rank ONLY those, then explain the top pick. Nothing is invented.";
+  btn(btns,"▶ Run the chain",play,true);
+};
+
+/* --- Langfuse trace --- */
+FIGS.trace = (stage, note, btns) => {
+  stage.innerHTML="";
+  const rows=[["parse_query","haiku","312 tokens","0.4s"],["rerank","sonnet","1,204 tokens","1.1s"],["explain","haiku","198 tokens","0.5s"]];
+  const t=document.createElement("div"); t.style.cssText="font-family:"+cssv("--font-mono")+";font-size:11.5px";
+  t.innerHTML=`<div style="color:var(--faint);display:grid;grid-template-columns:1.2fr .8fr 1fr .6fr;gap:6px;padding:0 8px 6px;border-bottom:1px solid var(--line)">
+    <span>span</span><span>model</span><span>tokens</span><span>lat</span></div>`;
+  stage.appendChild(t);
+  rows.forEach((r,i)=>{ const d=document.createElement("div"); d.style.cssText=
+    "opacity:0;display:grid;grid-template-columns:1.2fr .8fr 1fr .6fr;gap:6px;padding:8px;border-radius:7px;transition:opacity .4s;"+(i%2?"":"background:var(--panel-2)");
+    d.innerHTML=`<span style="color:var(--l4);font-weight:700">${r[0]}</span><span>${r[1]}</span><span>${r[2]}</span><span style="color:var(--teal)">${r[3]}</span>`;
+    t.appendChild(d); });
+  const play=()=>{ t.querySelectorAll("div[style*=grid]").forEach((d,i)=>{ if(i>0) setTimeout(()=>d.style.opacity=1,(i-1)*400); }); };
+  play();
+  note.textContent="One conversational search = one Langfuse trace with a span per LLM call — model, token count and latency, all inspectable after the fact.";
+  btn(btns,"▶ Capture trace",play,true);
+};
+
+/* --- FastAPI routes --- */
+FIGS.api = (stage, note, btns) => {
+  stage.innerHTML="";
+  const routes=[["GET","/recommendations/{id}","returning-user recs (cached)"],["POST","/chat","conversational search"],
+    ["POST","/onboarding","cold-start seed"],["POST","/feedback","log a reaction"],["GET","/explain/{id}","why this?"],
+    ["GET","/graph/insights/{id}","co-raters + genres"],["GET","/health","live status"]];
+  const list=document.createElement("div"); list.style.cssText="display:flex;flex-direction:column;gap:6px";
+  stage.appendChild(list);
+  routes.forEach(r=>{ const d=document.createElement("button"); d.className="fbtn";
+    d.style.cssText="display:flex;gap:10px;align-items:center;text-align:left;width:100%;cursor:pointer";
+    const col=r[0]==="GET"?"var(--teal)":"var(--accent)";
+    d.innerHTML=`<span style="font-family:${cssv('--font-mono')};font-weight:700;color:${col};min-width:42px">${r[0]}</span>
+      <span style="font-family:${cssv('--font-mono')};font-size:11.5px">${r[1]}</span>`;
+    d.onclick=()=>{ note.textContent=r[0]+" "+r[1]+" — "+r[2]+"."; };
+    list.appendChild(d); });
+  note.textContent="Seven routes wire the pipeline to the web. Click any to see what it does.";
+};
+
+/* --- Docker stack --- */
+FIGS.docker = (stage, note, btns) => {
+  const {ctx,w,h}=makeCanvas(stage,240);
+  const svcs=[["API","--l5"],["Qdrant","--l3"],["Postgres","--l3"],["Redis","--l3"],["Neo4j","--l3"]];
+  let mode="compose", raf, t=0;
+  const draw=()=>{
+    ctx.clearRect(0,0,w,h);
+    const ink=cssv("--ink"), faint=cssv("--faint"), acc=cssv("--accent");
+    if(mode==="compose"){
+      // whale + 5 containers
+      ctx.fillStyle=faint; ctx.font="600 11px "+cssv("--font-body"); ctx.textAlign="center";
+      ctx.fillText("🐳 docker compose up  →  one networked stack", w/2, 20);
+      const bw=(w-30)/5;
+      svcs.forEach((s,i)=>{ const x=15+i*bw, y=60, bh=90;
+        const pulse=0.5+0.5*Math.sin(t*0.05+i);
+        ctx.fillStyle=cssv(s[1]); ctx.globalAlpha=0.14; ctx.beginPath(); ctx.roundRect(x,y,bw-10,bh,9); ctx.fill(); ctx.globalAlpha=1;
+        ctx.strokeStyle=cssv(s[1]); ctx.lineWidth=1.5; ctx.beginPath(); ctx.roundRect(x,y,bw-10,bh,9); ctx.stroke();
+        ctx.fillStyle=cssv(s[1]); ctx.globalAlpha=0.4+0.5*pulse; ctx.beginPath(); ctx.arc(x+(bw-10)/2,y+22,6,0,7); ctx.fill(); ctx.globalAlpha=1;
+        ctx.fillStyle=ink; ctx.font="600 10px "+cssv("--font-body"); ctx.fillText(s[0], x+(bw-10)/2, y+bh-12); });
+      // network line
+      ctx.strokeStyle=faint; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(15,175); ctx.lineTo(w-15,175); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle=faint; ctx.font="10px "+cssv("--font-mono"); ctx.fillText("internal network — services reach each other by name", w/2, 195);
+    } else {
+      // render single service
+      ctx.fillStyle=faint; ctx.font="600 11px "+cssv("--font-body"); ctx.textAlign="center";
+      ctx.fillText("Dockerfile.render  →  one lean process", w/2, 20);
+      const x=w/2-70, y=55, bw=140, bh=110;
+      ctx.fillStyle=acc; ctx.globalAlpha=0.12; ctx.beginPath(); ctx.roundRect(x,y,bw,bh,10); ctx.fill(); ctx.globalAlpha=1;
+      ctx.strokeStyle=acc; ctx.lineWidth=1.5; ctx.beginPath(); ctx.roundRect(x,y,bw,bh,10); ctx.stroke();
+      ctx.fillStyle=ink; ctx.font="700 12px "+cssv("--font-body"); ctx.fillText("API + baked-in", w/2, y+42);
+      ctx.fillText("data/ + artifacts/", w/2, y+60);
+      ctx.fillStyle=faint; ctx.font="10px "+cssv("--font-body");
+      ctx.fillText("no sidecars — graceful fallbacks", w/2, y+86);
+      svcs.slice(1).forEach((s,i)=>{ const gx=20+i*((w-40)/4)+((w-40)/4)/2; ctx.fillStyle=faint; ctx.globalAlpha=0.4;
+        ctx.font="9px "+cssv("--font-body"); ctx.fillText(s[0]+" ✕", gx, 200); ctx.globalAlpha=1; });
+    }
+    t++; raf=requestAnimationFrame(draw);
+  };
+  draw();
+  note.textContent="Locally, compose runs five services as one stack. For deploy, a single lean image bakes the data in and drops the sidecars — the fallbacks cover the gap.";
+  btn(btns,"🐳 compose (local)",()=>{ mode="compose"; note.textContent="Five containers, one command, networked by service name — the full local stack."; },true);
+  btn(btns,"☁ Render (deploy)",()=>{ mode="render"; note.textContent="One process, data baked in, no databases — recommender/graph/feedback degrade gracefully."; });
+  stage._stop=()=>cancelAnimationFrame(raf);
+};
+
+/* --- React UI mock --- */
+FIGS.ui = (stage, note, btns) => {
+  stage.innerHTML="";
+  const card=document.createElement("div");
+  card.style.cssText="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel-2)";
+  card.innerHTML=`
+    <div style="display:flex;gap:12px;padding:12px">
+      <div style="width:56px;height:80px;border-radius:6px;background:linear-gradient(135deg,var(--l6),var(--accent));flex:none"></div>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:14px">Dances with Wolves <span style="color:var(--faint);font-weight:400">(1990)</span></div>
+        <div style="display:flex;gap:5px;margin:6px 0">
+          <span style="font-size:10px;background:var(--l6-bg);color:var(--l6);padding:2px 8px;border-radius:20px">Adventure</span>
+          <span style="font-size:10px;background:var(--l6-bg);color:var(--l6);padding:2px 8px;border-radius:20px">Drama</span>
+        </div>
+        <div style="font-family:${cssv('--font-mono')};font-size:11px;color:var(--gold)">score 0.703</div>
+      </div>
+      <div style="font-size:20px;cursor:pointer" id="starBtn" title="watchlist">☆</div>
+    </div>
+    <div id="whyPanel" style="max-height:0;overflow:hidden;transition:max-height .4s;background:var(--panel);border-top:1px solid var(--line)">
+      <div style="padding:12px;font-size:12.5px;color:var(--muted)">A lieutenant questions his purpose after contact with a Sioux community — clever, heartfelt, exactly your ask.</div>
+    </div>`;
+  stage.appendChild(card);
+  card.querySelector("#starBtn").onclick=(e)=>{ const on=e.target.textContent==="☆";
+    e.target.textContent=on?"★":"☆"; e.target.style.color=on?"var(--accent)":"";
+    note.textContent=on?"Saved to the watchlist (localStorage-backed — survives refresh).":"Removed from watchlist."; };
+  note.textContent="A real recommendation card. Click ★ to save it, or 'Why this?' to expand the grounded LLM explanation.";
+  btn(btns,"💬 Why this?",()=>{ const p=card.querySelector("#whyPanel"); const open=p.style.maxHeight!=="120px";
+    p.style.maxHeight=open?"120px":"0"; note.textContent=open?"The 'Why this?' panel calls /explain — grounded in real genres + plot.":"Collapsed."; },true);
+};
+
+/* --- Streamlit --- */
+FIGS.streamlit = (stage, note, btns) => {
+  stage.innerHTML="";
+  const tabs=["Returning user","Conversational search","New user","Watchlist (1)"];
+  const bar=document.createElement("div"); bar.style.cssText="display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:12px;flex-wrap:wrap";
+  const body=document.createElement("div"); body.style.cssText="font-size:12.5px;color:var(--muted);min-height:70px";
+  const texts=[
+    "Two-tower + popularity-prior recs for a user with rating history. Cached locally so reruns are instant.",
+    "Free-text → parse → grounded retrieval → LLM re-rank → explanation. Suggestion chips included.",
+    "Cold-start: describe your taste, get content-based seed movies — no history needed.",
+    "Session-state watchlist. Because Streamlit reruns the whole script per click, session_state is what stops the list vanishing."
+  ];
+  tabs.forEach((t,i)=>{ const b=document.createElement("button"); b.textContent=t;
+    b.style.cssText="border:none;background:none;font-family:inherit;font-size:12px;font-weight:600;padding:7px 10px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px";
+    b.onclick=()=>{ bar.querySelectorAll("button").forEach(x=>{x.style.color="var(--muted)";x.style.borderBottomColor="transparent";});
+      b.style.color="var(--accent)"; b.style.borderBottomColor="var(--accent)"; body.textContent=texts[i]; };
+    bar.appendChild(b); });
+  stage.appendChild(bar); stage.appendChild(body);
+  bar.querySelector("button").click();
+  note.textContent="The Streamlit demo mirrors the React app's features as tabs — same engine, simpler widget model. Click the tabs.";
+};
+
+/* ------------------------------------------------------------------ *
+ *  boot + theme + routing                                            *
+ * ------------------------------------------------------------------ */
+function toggleTheme(){
+  const cur = document.documentElement.getAttribute("data-theme");
+  const sysDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const now = cur ? cur : (sysDark ? "dark":"light");
+  const next = now==="dark" ? "light":"dark";
+  document.documentElement.setAttribute("data-theme", next);
+  // re-render an open figure so canvas colors update
+  const open = location.hash.slice(1);
+  if (open && C[open]) openDetail(open);
+}
+
+buildLegend();
+buildMap();
+
+// deep-link support
+window.addEventListener("load", ()=>{ const h=location.hash.slice(1); if(h && C[h]) openDetail(h); });
+window.addEventListener("hashchange", ()=>{ const h=location.hash.slice(1);
+  if(!h){ showMap(); } });
+window.addEventListener("resize", ()=>{ const h=location.hash.slice(1); if(h && C[h]) openDetail(h); });
+</script>
+</body>
+</html>

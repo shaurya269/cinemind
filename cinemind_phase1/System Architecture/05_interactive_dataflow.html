@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CineMind — Interactive Data Flow</title>
+<style>
+  :root {
+    --ground: #F4F3EE; --panel: #FFFFFF; --panel-2: #FAF9F5;
+    --ink: #191D24; --muted: #5A6473; --faint: #8A93A2;
+    --accent: #E8493A; --accent-soft: #FBE7E4; --gold: #B98514; --teal: #1F9E88;
+    --line: #E2E0D7; --line-strong: #CBC9BE;
+    --shadow: 0 1px 2px rgba(24,28,36,.05), 0 8px 24px rgba(24,28,36,.06);
+    /* three lanes */
+    --a: #8261CC; --a-bg: #F1ECFB;   /* offline / training */
+    --b: #B9860F; --b-bg: #FBF2DF;   /* live request       */
+    --c: #3F9A46; --c-bg: #EBF6EA;   /* feedback loop      */
+    --font-display: "Bebas Neue", "Arial Narrow", "Haettenschweiler", sans-serif;
+    --font-body: "Inter", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "Cascadia Code", "Consolas", "SFMono-Regular", ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0E1116; --panel: #171B22; --panel-2: #1D222B;
+      --ink: #ECEAE3; --muted: #9AA3B4; --faint: #626C7E;
+      --accent: #F1584A; --accent-soft: #331A18; --gold: #E3B65A; --teal: #4FD1B8;
+      --line: #29303C; --line-strong: #38414F;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+      --a: #B79BF0; --a-bg: #221B35; --b: #F0C463; --b-bg: #2F2610; --c: #82D18A; --c-bg: #152D18;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0E1116; --panel: #171B22; --panel-2: #1D222B;
+    --ink: #ECEAE3; --muted: #9AA3B4; --faint: #626C7E;
+    --accent: #F1584A; --accent-soft: #331A18; --gold: #E3B65A; --teal: #4FD1B8;
+    --line: #29303C; --line-strong: #38414F;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    --a: #B79BF0; --a-bg: #221B35; --b: #F0C463; --b-bg: #2F2610; --c: #82D18A; --c-bg: #152D18;
+  }
+  :root[data-theme="light"] {
+    --ground: #F4F3EE; --panel: #FFFFFF; --panel-2: #FAF9F5;
+    --ink: #191D24; --muted: #5A6473; --faint: #8A93A2;
+    --accent: #E8493A; --accent-soft: #FBE7E4; --gold: #B98514; --teal: #1F9E88;
+    --line: #E2E0D7; --line-strong: #CBC9BE;
+    --shadow: 0 1px 2px rgba(24,28,36,.05), 0 8px 24px rgba(24,28,36,.06);
+    --a: #8261CC; --a-bg: #F1ECFB; --b: #B9860F; --b-bg: #FBF2DF; --c: #3F9A46; --c-bg: #EBF6EA;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--ground); color: var(--ink); font-family: var(--font-body); line-height: 1.55; -webkit-font-smoothing: antialiased; }
+
+  .topbar {
+    position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 16px;
+    padding: 14px 26px; background: color-mix(in srgb, var(--ground) 86%, transparent);
+    backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; cursor: pointer; user-select: none; }
+  .brand .logo { font-family: var(--font-display); font-size: 30px; letter-spacing: 1.5px; line-height: 1; position: relative; }
+  .brand .logo::after { content: ""; position: absolute; left: 0; right: 0; bottom: -4px; height: 3px; background: var(--accent); border-radius: 2px; }
+  .brand .kicker { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--faint); font-weight: 600; }
+  .crumbs { flex: 1; font-size: 13px; color: var(--muted); }
+  .crumbs b { color: var(--ink); font-weight: 600; }
+  .topbtn { border: 1px solid var(--line-strong); background: var(--panel); color: var(--muted); border-radius: 8px; padding: 7px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .topbtn:hover { color: var(--ink); border-color: var(--accent); }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 32px 26px 100px; }
+
+  .hero { padding: 26px 0 8px; }
+  .hero h1 { font-family: var(--font-display); font-weight: 400; letter-spacing: .5px; font-size: clamp(38px, 6vw, 64px); line-height: .98; margin: 0 0 10px; text-wrap: balance; }
+  .hero h1 .rd { color: var(--accent); }
+  .hero p.lede { font-size: 16.5px; color: var(--muted); max-width: 70ch; margin: 0; }
+  .hint { margin-top: 18px; font-size: 13px; color: var(--faint); display: inline-flex; align-items: center; gap: 8px; }
+  .hint .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:.35; transform:scale(.8)} 50%{opacity:1; transform:scale(1.15)} }
+
+  /* lane */
+  .lane { margin-top: 26px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); box-shadow: var(--shadow); overflow: hidden; }
+  .lane-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--lbg); }
+  .lane-tag { font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: #fff; background: var(--lc); padding: 3px 9px; border-radius: 6px; letter-spacing: .5px; }
+  .lane-name { font-weight: 700; font-size: 16px; }
+  .lane-when { margin-left: auto; font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+  .steps { padding: 8px; }
+  .step {
+    width: 100%; text-align: left; cursor: pointer; font-family: inherit;
+    display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 14px;
+    padding: 13px 14px; border: 1px solid transparent; border-radius: 11px; background: transparent;
+    transition: background .12s, border-color .12s, transform .1s;
+  }
+  .step:hover { background: var(--panel-2); border-color: var(--lc); transform: translateX(3px); }
+  .step:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .step + .step { border-top: 0; }
+  .step .num { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; font-family: var(--font-mono); font-weight: 700; font-size: 14px; color: #fff; background: var(--lc); }
+  .step .stitle { font-weight: 700; font-size: 14.5px; }
+  .step .sdesc { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .step .sarrow { color: var(--faint); font-size: 18px; }
+  .step .sio { font-family: var(--font-mono); font-size: 10.5px; color: var(--lc); font-weight: 600; margin-top: 4px; }
+
+  .connector { display: flex; align-items: center; gap: 12px; padding: 6px 26px; color: var(--faint); font-size: 12px; }
+  .connector .l { flex: 1; height: 1px; background: repeating-linear-gradient(90deg,var(--line-strong) 0 6px,transparent 6px 12px); }
+
+  /* detail (reuses architecture styling) */
+  .detail { display: none; }
+  .detail.active { display: block; animation: fade .25s ease; }
+  .map.hidden { display: none; }
+  @keyframes fade { from { opacity: 0; transform: translateY(8px);} to {opacity:1; transform:none;} }
+  .back { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; background: none; border: none; color: var(--muted); font-weight: 600; font-size: 13.5px; padding: 4px 0; margin-bottom: 6px; font-family: inherit; }
+  .back:hover { color: var(--accent); }
+  .dhead { display: flex; align-items: flex-start; gap: 16px; margin: 6px 0 8px; }
+  .dhead .dic { width: 58px; height: 58px; flex: none; border-radius: 14px; display: grid; place-items: center; font-family: var(--font-mono); font-weight: 700; font-size: 24px; color: #fff; background: var(--lc); }
+  .dhead h2 { font-family: var(--font-display); font-weight: 400; letter-spacing: .5px; font-size: clamp(28px, 4.2vw, 42px); margin: 2px 0 4px; line-height: 1; }
+  .dhead .dsub { color: var(--muted); font-size: 15px; }
+  .dhead .dtool { display: inline-block; margin-top: 8px; font-family: var(--font-mono); font-size: 12px; color: #fff; background: var(--lc); padding: 3px 9px; border-radius: 6px; }
+  .dcols { display: grid; grid-template-columns: 1fr; gap: 22px; margin-top: 22px; }
+  @media (min-width: 860px) { .dcols { grid-template-columns: 1.05fr .95fr; } }
+  .card { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); padding: 20px 22px; margin-bottom: 18px; }
+  .card h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1.4px; color: var(--faint); margin: 0 0 12px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .card h3::before { content: ""; width: 14px; height: 2px; background: var(--lc, var(--accent)); }
+  .card p { margin: 0 0 12px; font-size: 14.5px; }
+  .card p:last-child { margin-bottom: 0; }
+  .card .q { color: var(--muted); }
+  .card strong { color: var(--ink); }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13.5px; }
+  .kv dt { color: var(--faint); font-weight: 600; font-family: var(--font-mono); font-size: 12px; }
+  .kv dd { margin: 0; }
+  code { font-family: var(--font-mono); font-size: 12.5px; background: var(--panel-2); padding: 1.5px 6px; border-radius: 5px; border: 1px solid var(--line); }
+  .figure { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); padding: 16px; position: sticky; top: 78px; }
+  .figure .ftitle { font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--faint); font-weight: 700; margin-bottom: 4px; }
+  .figure .fnote { font-size: 12.5px; color: var(--muted); min-height: 34px; margin-top: 10px; }
+  .btnrow { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .fbtn { border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--ink); border-radius: 8px; padding: 7px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .fbtn:hover { border-color: var(--accent); }
+  .fbtn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .related { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { cursor: pointer; font-family: inherit; font-size: 12.5px; font-weight: 600; border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--muted); padding: 6px 11px; border-radius: 20px; }
+  .chip:hover { color: var(--accent); border-color: var(--accent); }
+  .prevnext { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; }
+  .pn { flex: 1; cursor: pointer; font-family: inherit; text-align: left; border: 1px solid var(--line); background: var(--panel-2); border-radius: 11px; padding: 11px 14px; transition: border-color .12s; }
+  .pn:hover { border-color: var(--accent); }
+  .pn.next { text-align: right; }
+  .pn .pnl { font-size: 10.5px; text-transform: uppercase; letter-spacing: 1px; color: var(--faint); font-weight: 700; }
+  .pn .pnt { font-weight: 700; font-size: 13.5px; margin-top: 2px; }
+  .pn.dim { opacity: .35; pointer-events: none; }
+  .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--faint); font-size: 12.5px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 22px 0 4px; }
+  .legend .li { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+  .legend .sw { width: 12px; height: 12px; border-radius: 3px; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; } }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand" onclick="showMap()">
+    <span class="logo">CINEMIND</span>
+    <span class="kicker">Data-Flow Explorer</span>
+  </div>
+  <div class="crumbs" id="crumbs"><b>End-to-end flow</b> — click any step</div>
+  <button class="topbtn" onclick="location.href='04_interactive_architecture.html'">Architecture ↗</button>
+  <button class="topbtn" onclick="toggleTheme()">◐ Theme</button>
+</div>
+
+<div class="wrap map" id="mapView">
+  <div class="hero">
+    <h1>How data moves through <span class="rd">CineMind</span></h1>
+    <p class="lede">Follow a single thread from raw MovieLens files, through offline training and
+      embedding, into a live web request that returns an explained recommendation — and back
+      again as feedback that improves the model. Every step is clickable.</p>
+    <div class="hint"><span class="dot"></span> Three lanes: what happens once (offline), what happens per request (live), and the loop that closes.</div>
+  </div>
+
+  <div class="legend">
+    <span class="li"><span class="sw" style="background:var(--a)"></span>Lane A · Offline (train once)</span>
+    <span class="li"><span class="sw" style="background:var(--b)"></span>Lane B · Live request (per user)</span>
+    <span class="li"><span class="sw" style="background:var(--c)"></span>Lane C · Feedback loop</span>
+  </div>
+
+  <div id="lanes"></div>
+
+  <div class="footer">
+    <span>CineMind — from preprocessing to a live, explained recommendation.</span>
+    <span>Interactive companion to <code>03_data_flow_diagram.html</code></span>
+  </div>
+</div>
+
+<div class="wrap detail" id="detailView"></div>
+
+<script>
+/* ---------- lanes + ordered steps ---------- */
+const LANES = [
+  { id:"a", tag:"A", name:"Offline — build the brains", when:"run once, in order 01→08",
+    steps:["ingest","content","train","index","enrich","graph"] },
+  { id:"b", tag:"B", name:"Live — answer a request", when:"every user request",
+    steps:["arrive","route","candidates","rank","reason","respond"] },
+  { id:"c", tag:"c", name:"Feedback — close the loop", when:"after the user reacts",
+    steps:["react","store","retrain"] },
+];
+
+const S = {
+  /* -------- Lane A -------- */
+  ingest: { n:1, lane:"a", icon:"01", title:"Ingest & preprocess", tool:"src/01_data_exploration.py",
+    sub:"Raw MovieLens files → clean, split CSVs everything else reads.",
+    io:"u.data / u.item  →  train_positives.csv · test_positives.csv · items.csv",
+    what:"The pipeline starts with three raw ml-100k files. Script 01 loads them, does EDA, and writes the clean CSVs the rest of the system consumes. It's the only script that touches the raw files.",
+    how:"Two decisions are baked in here. <strong>Implicit feedback</strong>: a rating ≥ 4 becomes one positive interaction, everything else is dropped — the model learns 'liked / didn't engage', not star prediction. <strong>Temporal split</strong>: each user's ratings are sorted by time and the last 20% held out for testing.",
+    role_:"Every downstream step depends on this output. If <code>items.csv</code> or the split CSVs are missing, <code>recommender.load()</code> raises immediately — there's no fallback for missing artifacts, only for missing <em>services</em>.",
+    why:"The temporal split is the integrity guarantee: the model is scored only on ratings that chronologically follow its training data, so the benchmark can't be inflated by leakage.",
+    fig:"split", related:["content","train","react"] },
+  content: { n:2, lane:"a", icon:"02", title:"Content embeddings", tool:"E5 · src/03_content_embeddings.py",
+    sub:"Every movie's title+genres → a meaning vector.",
+    io:"items.csv  →  content_vecs.npy · content_movie_ids.npy",
+    what:"Script 03 runs the E5 model (intfloat/e5-small-v2) over each movie's <code>title + genres</code>, producing a unit-length vector per film. Similar movies land near each other in this space.",
+    how:"E5 needs a <code>passage:</code> prefix for the documents. The vectors are saved to <code>content_vecs.npy</code>, aligned by <code>content_movie_ids.npy</code>. First run downloads ~130MB; after that it's cached.",
+    role_:"This is what makes semantic search and cold-start possible. A brand-new user with zero ratings can still be served, because their described taste is embedded into this same space and matched by cosine similarity.",
+    why:"Crucially it also grounds the LLM: at request time, candidates come from these real embedded movies, so the model can only reason over films that actually exist.",
+    fig:"embed", related:["ingest","candidates","train"] },
+  train: { n:3, lane:"a", icon:"03", title:"Train the two-tower", tool:"PyTorch · src/04_two_tower.py",
+    sub:"Learn user + movie vectors from who-liked-what.",
+    io:"train_positives.csv  →  two_tower.pt · item_vecs.npy",
+    what:"The centrepiece. Two small networks learn a 64-d vector for every user and every movie such that a user·movie dot product predicts a 'like'. The item tower also ingests the 19 genre flags.",
+    how:"Training uses <strong>in-batch negatives</strong> (each batch of 512 positives becomes a 512×512 comparison) plus the essential <strong>logQ correction</strong> — subtracting <code>log(P(item))</code> to remove popularity bias. Without that one line the model loses to a popularity list. 60 epochs on CPU is fine.",
+    role_:"Produces <code>two_tower.pt</code> (the trained weights) and <code>item_vecs.npy</code> (precomputed movie vectors). The live returning-user path computes only the user vector at request time and dots it against these.",
+    why:"The hybrid (two-tower + 0.30·log-pop) hit Precision@10 = 0.094 vs 0.061 popularity and 0.075 RBM — the measurable win the whole project is built to demonstrate.",
+    fig:"twotower", related:["ingest","index","rank","retrain"] },
+  index: { n:4, lane:"a", icon:"04", title:"Index collab vectors", tool:"Qdrant · src/05_qdrant_indexing.py",
+    sub:"Load movie vectors into a search index (or fall back to numpy).",
+    io:"item_vecs.npy  →  Qdrant collection 'collab_vectors'",
+    what:"Script 05 pushes the two-tower item vectors into a Qdrant collection so 'movies like X' can be answered by fast approximate nearest-neighbour search.",
+    how:"Auto-detecting: if Qdrant is reachable it indexes there; if not, the same query is answered by a plain numpy dot-product over <code>item_vecs.npy</code>. Identical answers on 1,682 movies — the index matters at scale.",
+    role_:"Backs <code>similar_to_movie()</code>. Note it holds the <em>collaborative</em> vectors; the content vectors are searched separately with numpy cosine.",
+    why:"It demonstrates the production shape: brute-force cosine is fine for a demo but impossible at millions of items — an ANN index is how you keep it fast.",
+    fig:"ann", related:["train","candidates"] },
+  enrich: { n:5, lane:"a", icon:"05", title:"Enrich with OMDb", tool:"src/07_omdb_enrichment.py",
+    sub:"Add posters, plots and cast (optional, resumable).",
+    io:"items.csv + OMDb API  →  movie_meta.csv",
+    what:"Script 07 fetches a poster, plot and cast for each movie from OMDb, matched by title+year (ml-100k has no id to join on), into <code>movie_meta.csv</code>. 1,548/1,682 matched.",
+    how:"Free tier is 1,000 lookups/day, so it supports multi-key rotation and is resumable. Entirely independent of the model — run any time after step 01.",
+    role_:"Presentational only. <code>recommender.py</code> merges it in when present; unmatched movies simply return no poster. The LLM 'Why this?' chain uses the plot to ground explanations.",
+    why:"Turns a bare ranked list into something that looks and reads like a real product — and gives the explanation layer real story details to work with.",
+    fig:"enrich", related:["reason","respond"] },
+  graph: { n:6, lane:"a", icon:"06", title:"Build the graph", tool:"Neo4j · src/08_neo4j_graph.py",
+    sub:"Mirror the ratings as a queryable graph.",
+    io:"ratings  →  (User)-[:RATED]->(Movie)-[:HAS_GENRE]->(Genre)",
+    what:"Script 08 loads the ratings into Neo4j as a graph — 55,375 RATED edges, 2,893 HAS_GENRE edges — using idempotent, batched MERGE statements.",
+    how:"Independent of the model; needs a running Neo4j. Once loaded, <code>graph.py</code> traverses it for co-rater and shared-genre insights via Cypher.",
+    role_:"Provides a fundamentally different signal from the vectors: real other-user behaviour ('501 users who rated this also rated…'), not a similarity number.",
+    why:"It's what powers the 'Graph insights' panel with a fact rather than a score — and shows the system blends collaborative, content, graph and language signals.",
+    fig:"graph", related:["respond","react"] },
+
+  /* -------- Lane B -------- */
+  arrive: { n:1, lane:"b", icon:"B1", title:"Request arrives", tool:"React / Streamlit → FastAPI",
+    sub:"A user asks for something — recs, a search, or onboarding.",
+    io:"browser click  →  HTTP request",
+    what:"A person interacts with the UI — opens their recommendations, types a conversational search, or fills the onboarding wizard. The frontend turns that into an HTTP call to FastAPI.",
+    how:"React uses a small fetch client (<code>api.js</code>); the Streamlit demo skips HTTP and calls the same Python functions directly. Either way the entry points are the same pipeline functions.",
+    role_:"This is the boundary between the human and the system. Everything after this is the online pipeline.",
+    why:"Because both UIs converge on the same <code>recommender.py</code> / <code>llm_chains.py</code>, there's one engine to reason about, not two.",
+    fig:"arrive", related:["route","respond"] },
+  route: { n:2, lane:"b", icon:"B2", title:"Route & branch", tool:"backend/main.py",
+    sub:"Known user? New user? Free-text query? Pick the path.",
+    io:"request  →  one of 7 routes",
+    what:"FastAPI dispatches to the right route and the pipeline branches on <em>who</em> is asking. <code>known_user()</code> decides whether the two-tower path is even usable.",
+    how:"A returning user with history → <code>/recommendations</code> (collaborative). A new user → <code>/onboarding</code> (content-only). A free-text request → <code>/chat</code> (RAG search). Unknown user on the recs route returns a clean 404 pointing to onboarding.",
+    role_:"This branch is the cold-start solution in action: the system never tries to run the collaborative model on someone it knows nothing about.",
+    why:"Choosing the path up front is what lets one system serve both a 5-year veteran and a first-time visitor without failing on either.",
+    fig:"route", related:["arrive","candidates","rank"] },
+  candidates: { n:3, lane:"b", icon:"B3", title:"Generate candidates", tool:"recommender.retrieve_candidates()",
+    sub:"Narrow ~1,700 movies down to ~30 worth considering.",
+    io:"query / user  →  ~30 candidate movies",
+    what:"For search and onboarding, the query is embedded with E5 and a cosine search over the content vectors returns ~30 real movies. For returning users, the two-tower produces scores over all items directly.",
+    how:"Every candidate is a genuine row from <code>items.csv</code>. If E5 can't load (first-run offline), a lexical keyword fallback keeps it working. Excluded genres from the parsed intent are filtered out here.",
+    role_:"This is the RAG 'retrieve' step — it fixes the universe of movies the LLM is allowed to consider, before any generation happens.",
+    why:"Retrieval-before-generation is exactly what stops the model inventing titles: it can only rank what was actually retrieved.",
+    fig:"embed", related:["content","rank","reason"] },
+  rank: { n:4, lane:"b", icon:"B4", title:"Rank (hybrid scorer)", tool:"two-tower + pop prior · Redis",
+    sub:"Score candidates, add popularity, mask seen, cache.",
+    io:"candidates  →  ordered top-k",
+    what:"For returning users, the user vector is dotted against item vectors, a <strong>0.30·log-popularity</strong> prior is added, already-seen movies are masked to −∞, and the top-k is taken.",
+    how:"The whole result is <strong>cache-aside in Redis</strong> under <code>recs:{user_id}:{k}</code> with a 5-minute TTL — a repeat request skips the model entirely (~24ms → ~1ms). No Redis just means always-fresh compute.",
+    role_:"This is the returning-user ranking. For conversational search, ranking is instead handed to the LLM re-ranker in the next step.",
+    why:"Blending learned taste with a popularity prior is what beat both pure approaches — and caching keeps a refresh from paying full model cost every time.",
+    fig:"cache", related:["train","reason","respond"] },
+  reason: { n:5, lane:"b", icon:"B5", title:"LLM reasoning", tool:"LangChain · Claude/Groq · Langfuse",
+    sub:"Parse → re-rank → explain, all grounded in retrieved movies.",
+    io:"~30 candidates  →  final 10 + a 'why'",
+    what:"When a key is set, the LLM layer runs: Haiku parses the query into a JSON intent, Sonnet re-ranks the retrieved candidates to a final 10 (choosing only from the given IDs), and Haiku writes a grounded 1–2 sentence explanation for the top pick.",
+    how:"Every call goes through <code>_invoke_or_none()</code>, which attaches a Langfuse trace and swallows failures into a retrieval-only fallback. Repeated IDs from free-tier models are de-duplicated while preserving rank.",
+    role_:"This is what makes results conversational and explainable rather than a bare list — and it's strictly bounded to real, retrieved movies.",
+    why:"With no API key the whole step is skipped gracefully: the user still gets retrieval-ranked results, never an error.",
+    fig:"llm", related:["candidates","enrich","respond"] },
+  respond: { n:6, lane:"b", icon:"B6", title:"Assemble & respond", tool:"FastAPI JSON → UI",
+    sub:"Attach posters, scores, why & graph → render cards.",
+    io:"final 10  →  JSON  →  rendered cards",
+    what:"The final movies are assembled into JSON: title, score, genres, poster/plot/cast (if enriched), the 'why' explanation, and — on demand — graph insights. The UI renders cards.",
+    how:"Each card can lazily call <code>/explain/{id}</code> and <code>/graph/insights/{id}</code> for deeper detail. The React app adds watchlist, modal and filtering on top; Streamlit renders the same data as tabs.",
+    role_:"This is the payoff of the whole request path — the moment the user sees a personalised, explained, poster-rich recommendation.",
+    why:"Because every field traces back to a real retrieved movie and real metadata, what the user sees is trustworthy, not hallucinated.",
+    fig:"respond", related:["reason","enrich","graph","react"] },
+
+  /* -------- Lane C -------- */
+  react: { n:1, lane:"c", icon:"C1", title:"User reacts", tool:"👍 / 👎 in the UI",
+    sub:"A like, skip, or rating on a card.",
+    io:"click  →  POST /feedback",
+    what:"The user gives a signal — thumbs up/down, a like/skip, or a rating — on a recommendation card.",
+    how:"The UI sends <code>POST /feedback</code> with user_id, movie_id, and either a rating or a click flag (both optional).",
+    role_:"This is the raw material of improvement — the system observing whether its guesses landed.",
+    why:"A recommender that never sees reactions can't get better. This is where learning-from-use begins.",
+    fig:"react", related:["store","respond"] },
+  store: { n:2, lane:"c", icon:"C2", title:"Store durably", tool:"feedback.py · Postgres/SQLite",
+    sub:"Persist every event for later.",
+    io:"feedback event  →  DB row",
+    what:"<code>feedback.py</code> writes each event to Postgres when reachable, or a local SQLite file otherwise, so the app records feedback even with no Docker running.",
+    how:"Each row carries user, movie, rating/clicked and a timestamp. There's also a short-TTL interaction with Redis: caching stays fresh enough that recent feedback surfaces reasonably soon.",
+    role_:"Durable storage is what lets feedback accumulate into a dataset, rather than evaporating after the request.",
+    why:"The SQLite fallback means the loop is never silently broken just because a database is down.",
+    fig:"feedback", related:["react","retrain"] },
+  retrain: { n:3, lane:"c", icon:"C3", title:"Retrain & refresh", tool:"→ back to Lane A step 3",
+    sub:"Folded back into the two-tower — the loop closes.",
+    io:"accumulated feedback  →  new two_tower.pt",
+    what:"Periodically, accumulated feedback becomes new positive interactions and the two-tower is retrained — the same offline step 3, now with more/fresher data.",
+    how:"New weights replace <code>two_tower.pt</code> and <code>item_vecs.npy</code>; the cache's short TTL means updated recommendations propagate quickly rather than being pinned to stale results.",
+    role_:"This is the arrow that turns a static model into a living one, connecting Lane C back to Lane A.",
+    why:"It's the difference between a recommender that's frozen at training time and one that keeps adapting to how people actually respond.",
+    fig:"loop", related:["train","store"] },
+};
+
+/* flat ordered list for prev/next */
+const ORDER = [];
+LANES.forEach(l => l.steps.forEach(s => ORDER.push(s)));
+
+/* ---------- build map ---------- */
+function lc(l){ return `var(--${l})`; }
+function lbg(l){ return `var(--${l}-bg)`; }
+
+function buildLanes(){
+  const host=document.getElementById("lanes");
+  host.innerHTML = LANES.map((l,li)=>{
+    const steps = l.steps.map(id=>{
+      const s=S[id];
+      return `<button class="step" style="--lc:${lc(l.id)}" onclick="openStep('${id}')">
+        <span class="num">${s.icon}</span>
+        <span><span class="stitle">${s.title}</span><div class="sdesc">${s.sub}</div><div class="sio">${s.io}</div></span>
+        <span class="sarrow">→</span>
+      </button>`;
+    }).join("");
+    const conn = li<LANES.length-1 ? `<div class="connector"><div class="l"></div><span>then</span><div class="l"></div></div>`:"";
+    return `<section class="lane" style="--lc:${lc(l.id)};--lbg:${lbg(l.id)}">
+      <div class="lane-head"><span class="lane-tag">${l.tag}</span><span class="lane-name">${l.name}</span><span class="lane-when">${l.when}</span></div>
+      <div class="steps">${steps}</div>
+    </section>${conn}`;
+  }).join("");
+}
+
+/* ---------- detail ---------- */
+function openStep(id){
+  const s=S[id]; const view=document.getElementById("detailView");
+  const kv = s.io ? `<dt>in → out</dt><dd>${s.io}</dd>` : "";
+  const related = s.related.map(r=>`<button class="chip" onclick="openStep('${r}')">${S[r].icon} ${S[r].title}</button>`).join("");
+  const idx=ORDER.indexOf(id);
+  const prev=ORDER[idx-1], next=ORDER[idx+1];
+  const prevBtn = prev ? `<button class="pn" onclick="openStep('${prev}')"><div class="pnl">← Previous</div><div class="pnt">${S[prev].title}</div></button>`
+                       : `<button class="pn dim"><div class="pnl">Start</div><div class="pnt">—</div></button>`;
+  const nextBtn = next ? `<button class="pn next" onclick="openStep('${next}')"><div class="pnl">Next →</div><div class="pnt">${S[next].title}</div></button>`
+                       : `<button class="pn next dim"><div class="pnl">End of loop</div><div class="pnt">—</div></button>`;
+
+  view.innerHTML = `
+    <button class="back" onclick="showMap()">← Full flow</button>
+    <div class="dhead" style="--lc:${lc(s.lane)};--lbg:${lbg(s.lane)}">
+      <div class="dic">${s.icon}</div>
+      <div><h2>${s.title}</h2><div class="dsub">${s.sub}</div><span class="dtool">${s.tool}</span></div>
+    </div>
+    <div class="dcols">
+      <div>
+        <div class="card" style="--lc:${lc(s.lane)}"><h3>What happens</h3><p class="q">${s.what}</p></div>
+        <div class="card" style="--lc:${lc(s.lane)}"><h3>How it works</h3><p class="q">${s.how}</p></div>
+        <div class="card" style="--lc:${lc(s.lane)}"><h3>Its role in the flow</h3><p class="q">${s.role_}</p></div>
+        <div class="card" style="--lc:${lc(s.lane)}"><h3>Why it matters</h3><p class="q">${s.why}</p></div>
+      </div>
+      <div>
+        <div class="figure" style="--lc:${lc(s.lane)}">
+          <div class="ftitle">Interactive · ${s.title}</div>
+          <div class="figstage" id="figstage"></div>
+          <div class="fnote" id="fnote"></div>
+          <div class="btnrow" id="figbtns"></div>
+        </div>
+        <div class="card" style="--lc:${lc(s.lane)}"><h3>Data in / out</h3><dl class="kv">${kv}</dl></div>
+        <div class="card" style="--lc:${lc(s.lane)}"><h3>Connects to</h3><div class="related">${related}</div></div>
+      </div>
+    </div>
+    <div class="prevnext">${prevBtn}${nextBtn}</div>
+    <div class="footer"><span>Step: ${s.title}</span><span>CineMind Data-Flow Explorer</span></div>
+  `;
+  document.getElementById("crumbs").innerHTML=`<b>${s.title}</b> — ${s.tool}`;
+  document.getElementById("mapView").classList.add("hidden");
+  view.classList.add("active");
+  window.scrollTo({top:0,behavior:"instant"});
+  if(FIGS[s.fig]) FIGS[s.fig](document.getElementById("figstage"),document.getElementById("fnote"),document.getElementById("figbtns"));
+  location.hash=id;
+}
+function showMap(){
+  document.getElementById("detailView").classList.remove("active");
+  document.getElementById("mapView").classList.remove("hidden");
+  document.getElementById("crumbs").innerHTML=`<b>End-to-end flow</b> — click any step`;
+  if(location.hash) history.replaceState(null,"",location.pathname);
+  window.scrollTo({top:0,behavior:"instant"});
+}
+
+/* ---------- figures (shared style w/ architecture file) ---------- */
+const FIGS={};
+const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function makeCanvas(stage,h){ stage.innerHTML=""; const c=document.createElement("canvas");
+  const w=stage.clientWidth||360; const dpr=Math.min(window.devicePixelRatio||1,2);
+  c.width=w*dpr; c.height=h*dpr; c.style.width="100%"; c.style.height=h+"px";
+  const ctx=c.getContext("2d"); ctx.scale(dpr,dpr); stage.appendChild(c); return {c,ctx,w,h}; }
+function btn(host,label,fn,primary){ const b=document.createElement("button");
+  b.className="fbtn"+(primary?" primary":""); b.textContent=label; b.onclick=fn; host.appendChild(b); return b; }
+
+FIGS.split=(stage,note,btns)=>{ const {ctx,w,h}=makeCanvas(stage,180); let p=0,raf;
+  const draw=()=>{ ctx.clearRect(0,0,w,h);
+    const a=cssv("--a"),acc=cssv("--accent"),ink=cssv("--ink");
+    ctx.fillStyle=ink; ctx.font="600 12px "+cssv("--font-body"); ctx.textAlign="left";
+    ctx.fillText("One user's ratings, oldest → newest",12,22);
+    const n=24,x0=14,x1=w-14,y=70,r=6,cut=Math.floor(n*0.8);
+    for(let i=0;i<n;i++){ const x=x0+(x1-x0)*(i/(n-1)); const on=i/n<=p;
+      ctx.globalAlpha=on?1:0.12; ctx.fillStyle=i>=cut?acc:a; ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.fill(); ctx.globalAlpha=1; }
+    ctx.strokeStyle=a; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x0,y+20); ctx.lineTo(x0+(x1-x0)*(cut-0.5)/(n-1),y+20); ctx.stroke();
+    ctx.fillStyle=a; ctx.font="600 11px "+cssv("--font-body"); ctx.textAlign="center"; ctx.fillText("TRAIN (first 80%)",x0+(x1-x0)*0.4,y+38);
+    ctx.strokeStyle=acc; ctx.beginPath(); ctx.moveTo(x0+(x1-x0)*(cut-0.5)/(n-1),y+20); ctx.lineTo(x1,y+20); ctx.stroke();
+    ctx.fillStyle=acc; ctx.fillText("TEST (last 20%)",x0+(x1-x0)*0.9,y+38);
+    if(p<1){ p+=0.02; raf=requestAnimationFrame(draw); } };
+  draw(); note.textContent="Split by time, not at random — no rating from the test period ever informs training. Honest evaluation.";
+  btn(btns,"↻ Replay",()=>{p=0;cancelAnimationFrame(raf);draw();},true); stage._stop=()=>cancelAnimationFrame(raf); };
+
+FIGS.embed=(stage,note,btns)=>{ const {ctx,w,h}=makeCanvas(stage,240);
+  const pts=[]; const cl=[[0.28,0.34,"--a"],[0.7,0.3,"--teal"],[0.5,0.72,"--b"]];
+  cl.forEach(([cx,cy,col])=>{ for(let i=0;i<9;i++) pts.push({x:cx+(Math.random()-0.5)*0.22,y:cy+(Math.random()-0.5)*0.22,col}); });
+  let query=null,raf,tt=0;
+  const draw=()=>{ ctx.clearRect(0,0,w,h); const faint=cssv("--faint"),acc=cssv("--accent");
+    ctx.strokeStyle=cssv("--line"); for(let g=0.1;g<1;g+=0.18){ ctx.globalAlpha=0.5;
+      ctx.beginPath(); ctx.moveTo(g*w,10); ctx.lineTo(g*w,h-10); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(10,g*h); ctx.lineTo(w-10,g*h); ctx.stroke(); ctx.globalAlpha=1; }
+    if(query){ const wd=pts.map(pt=>({pt,d:Math.hypot(pt.x-query.x,pt.y-query.y)})).sort((a,b)=>a.d-b.d).slice(0,5);
+      wd.forEach(({pt})=>{ ctx.strokeStyle=acc; ctx.globalAlpha=0.4; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(query.x*w,query.y*h); ctx.lineTo(pt.x*w,pt.y*h); ctx.stroke(); ctx.globalAlpha=1; }); }
+    pts.forEach(pt=>{ ctx.fillStyle=cssv(pt.col); ctx.beginPath(); ctx.arc(pt.x*w,pt.y*h,5,0,7); ctx.fill(); });
+    if(query){ const pl=0.5+0.5*Math.sin(tt*0.1); ctx.fillStyle=acc; ctx.globalAlpha=0.2+0.2*pl; ctx.beginPath(); ctx.arc(query.x*w,query.y*h,14+3*pl,0,7); ctx.fill(); ctx.globalAlpha=1;
+      ctx.fillStyle=acc; ctx.beginPath(); ctx.arc(query.x*w,query.y*h,7,0,7); ctx.fill(); ctx.fillStyle="#fff"; ctx.font="700 9px "+cssv("--font-mono"); ctx.textAlign="center"; ctx.fillText("q",query.x*w,query.y*h+3); }
+    ctx.fillStyle=faint; ctx.font="10px "+cssv("--font-body"); ctx.textAlign="left"; ctx.fillText("each dot = a movie · nearby = similar meaning",10,h-6);
+    tt++; raf=requestAnimationFrame(draw); };
+  draw(); note.textContent="Click to drop a query. Its nearest real movies light up — those become the grounded candidates.";
+  stage.querySelector("canvas").style.cursor="crosshair";
+  stage.querySelector("canvas").onclick=(e)=>{ const r=e.target.getBoundingClientRect(); query={x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height};
+    note.textContent="Those 5 nearest movies are the RAG candidates — the LLM can only rank real, retrieved films."; };
+  btn(btns,"✦ Random query",()=>{ query={x:0.2+Math.random()*0.6,y:0.2+Math.random()*0.6}; note.textContent="Retrieved candidates fixed — generation can't escape them."; },true);
+  stage._stop=()=>cancelAnimationFrame(raf); };
+
+FIGS.twotower=(stage,note,btns)=>{ const {ctx,w,h}=makeCanvas(stage,230); let t=0,raf,running=true;
+  const draw=()=>{ const acc=cssv("--accent"),a=cssv("--a"),teal=cssv("--teal"),faint=cssv("--faint"),ink=cssv("--ink");
+    ctx.clearRect(0,0,w,h); const uX=w*0.17,iX=w*0.83,midX=w/2;
+    const tower=(x,label,col,seed)=>{ ctx.fillStyle=col; ctx.font="600 11px "+cssv("--font-body"); ctx.textAlign="center"; ctx.fillText(label,x,16);
+      for(let layer=0;layer<3;layer++){ const n=[3,4,2][layer],ly=36+layer*40;
+        for(let k=0;k<n;k++){ const nx=x-(n-1)*10+k*20;
+          if(layer<2){ const n2=[3,4,2][layer+1]; for(let j=0;j<n2;j++){ const nx2=x-(n2-1)*10+j*20,ny2=36+(layer+1)*40;
+            ctx.strokeStyle=col+"33"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(nx,ly); ctx.lineTo(nx2,ny2); ctx.stroke(); } }
+          const pulse=0.5+0.5*Math.sin(t*0.05+seed+k+layer); ctx.fillStyle=col; ctx.globalAlpha=0.35+0.55*pulse;
+          ctx.beginPath(); ctx.arc(nx,ly,4.5,0,7); ctx.fill(); ctx.globalAlpha=1; } }
+      for(let k=0;k<8;k++){ const bx=x-36+k*9,bh=5+14*(0.5+0.5*Math.sin(t*0.05+seed+k)); ctx.fillStyle=col; ctx.fillRect(bx,175-bh,6,bh); } };
+    tower(uX,"USER",a,0); tower(iX,"ITEM",teal,10);
+    const glow=0.5+0.5*Math.sin(t*0.05);
+    ctx.strokeStyle=acc+"66"; ctx.lineWidth=2; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(uX+40,172); ctx.lineTo(midX-22,h/2+30); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(iX-40,172); ctx.lineTo(midX+22,h/2+30); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle=acc; ctx.beginPath(); ctx.arc(midX,h/2+30,18,0,7); ctx.fill();
+    ctx.fillStyle="#fff"; ctx.font="700 14px "+cssv("--font-mono"); ctx.textAlign="center"; ctx.fillText("·",midX,h/2+35);
+    ctx.fillStyle=acc; ctx.font="700 13px "+cssv("--font-mono"); ctx.fillText("score "+(0.5+0.49*glow).toFixed(2),midX,h/2+66);
+    if(running){ t++; raf=requestAnimationFrame(draw); } };
+  draw(); note.textContent="User vector · item vector = match score. Trained with in-batch negatives + the logQ correction that removes popularity bias.";
+  btn(btns,"⏸ Pause",(e)=>{ running=!running; e.target.textContent=running?"⏸ Pause":"▶ Play"; if(running) draw(); },true);
+  stage._stop=()=>{running=false;cancelAnimationFrame(raf);}; };
+
+FIGS.ann=(stage,note,btns)=>{ const {ctx,w,h}=makeCanvas(stage,220);
+  const pts=Array.from({length:60},()=>({x:Math.random(),y:Math.random()})); const q={x:0.5,y:0.5}; let mode="ann",step=0,raf;
+  const draw=()=>{ ctx.clearRect(0,0,w,h); const acc=cssv("--accent"),a=cssv("--a"),faint=cssv("--faint");
+    const wd=pts.map((p,i)=>({p,d:Math.hypot(p.x-q.x,p.y-q.y)})).sort((x,y)=>x.d-y.d);
+    const scanned=mode==="numpy"?Math.min(step,pts.length):Math.min(step,8);
+    pts.forEach(p=>{ ctx.fillStyle=faint; ctx.globalAlpha=0.4; ctx.beginPath(); ctx.arc(p.x*w,p.y*h,4,0,7); ctx.fill(); ctx.globalAlpha=1; });
+    if(mode==="numpy") wd.slice(0,scanned).forEach(({p})=>{ ctx.strokeStyle=faint; ctx.globalAlpha=0.5; ctx.beginPath(); ctx.moveTo(q.x*w,q.y*h); ctx.lineTo(p.x*w,p.y*h); ctx.stroke(); ctx.globalAlpha=1; });
+    wd.slice(0,Math.min(scanned,5)).forEach(({p})=>{ ctx.fillStyle=a; ctx.beginPath(); ctx.arc(p.x*w,p.y*h,6,0,7); ctx.fill(); });
+    ctx.fillStyle=acc; ctx.beginPath(); ctx.arc(q.x*w,q.y*h,8,0,7); ctx.fill(); ctx.fillStyle="#fff"; ctx.font="700 9px "+cssv("--font-mono"); ctx.textAlign="center"; ctx.fillText("X",q.x*w,q.y*h+3);
+    ctx.fillStyle=faint; ctx.font="600 11px "+cssv("--font-mono"); ctx.textAlign="left"; ctx.fillText(mode==="numpy"?`numpy: compared ${scanned}/60`:`ANN: top ${Math.min(scanned,5)}`,10,16);
+    if(step<(mode==="numpy"?pts.length:8)){ step+=mode==="numpy"?2:1; raf=requestAnimationFrame(draw); } };
+  const run=(m)=>{ mode=m; step=0; cancelAnimationFrame(raf); draw(); }; run("ann");
+  note.textContent="Both return the 5 nearest movies. Qdrant's index skips the full scan the numpy fallback must do.";
+  btn(btns,"⚡ ANN (Qdrant)",()=>{run("ann");note.textContent="Near-instant, even on huge catalogues.";},true);
+  btn(btns,"🐢 numpy scan",()=>{run("numpy");note.textContent="Compares against every movie — fine for 1,682, not for millions.";});
+  stage._stop=()=>cancelAnimationFrame(raf); };
+
+FIGS.enrich=(stage,note,btns)=>{ stage.innerHTML="";
+  const card=document.createElement("div"); card.style.cssText="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel-2);display:flex;gap:12px;padding:12px;align-items:center";
+  const poster=document.createElement("div"); poster.style.cssText="width:60px;height:86px;border-radius:6px;background:var(--line);flex:none;transition:background .5s;display:grid;place-items:center;font-size:20px;color:var(--faint)"; poster.textContent="?";
+  const meta=document.createElement("div"); meta.innerHTML=`<div style="font-weight:700;font-size:14px">Movie #181</div><div id="mline" style="font-size:12px;color:var(--faint);margin-top:4px">title + genres only</div>`;
+  card.appendChild(poster); card.appendChild(meta); stage.appendChild(card);
+  note.textContent="Before enrichment a movie is just a title and genres. OMDb adds the poster, plot and cast — matched by title+year.";
+  btn(btns,"🖼 Fetch from OMDb",()=>{ poster.style.background="linear-gradient(135deg,var(--a),var(--accent))"; poster.textContent="🎬"; poster.style.color="#fff";
+    document.getElementById("mline").innerHTML="<span style='color:var(--teal)'>+ poster · plot · cast</span> — now product-ready"; note.textContent="Matched (1,548/1,682 are). Unmatched movies simply keep no poster — nothing breaks."; },true);
+  btn(btns,"✕ No match",()=>{ document.getElementById("mline").innerHTML="unmatched — <span style='color:var(--muted)'>poster_url = None</span>, still works"; note.textContent="134 obscure titles aren't in OMDb. The pipeline degrades gracefully — they just render without a poster."; }); };
+
+FIGS.graph=(stage,note,btns)=>{ const {ctx,w,h}=makeCanvas(stage,240);
+  const movie={x:w/2,y:h/2}; const users=Array.from({length:6},(_,i)=>({a:Math.PI*2*i/6,r:66}));
+  const others=Array.from({length:5},(_,i)=>({a:Math.PI*2*i/5-0.3,r:112})); let step=0,raf,running=true;
+  const draw=()=>{ ctx.clearRect(0,0,w,h); const c=cssv("--c"),acc=cssv("--accent"),a=cssv("--a"),faint=cssv("--faint");
+    const uPos=users.map(u=>({x:movie.x+Math.cos(u.a)*u.r,y:movie.y+Math.sin(u.a)*u.r}));
+    const oPos=others.map(o=>({x:movie.x+Math.cos(o.a)*o.r,y:movie.y+Math.sin(o.a)*o.r}));
+    if(step>=1) uPos.forEach(u=>{ ctx.strokeStyle=c; ctx.globalAlpha=Math.min(1,(step-1)*0.5||0.5); ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(movie.x,movie.y); ctx.lineTo(u.x,u.y); ctx.stroke(); ctx.globalAlpha=1; });
+    if(step>=2) uPos.forEach(u=>oPos.forEach((o,j)=>{ if((j+Math.round(u.x))%2<1){ ctx.strokeStyle=acc; ctx.globalAlpha=0.25; ctx.beginPath(); ctx.moveTo(u.x,u.y); ctx.lineTo(o.x,o.y); ctx.stroke(); ctx.globalAlpha=1; } }));
+    if(step>=2) oPos.forEach(o=>{ ctx.fillStyle=acc; ctx.beginPath(); ctx.arc(o.x,o.y,9,0,7); ctx.fill(); ctx.fillStyle="#fff"; ctx.font="8px "+cssv("--font-body"); ctx.textAlign="center"; ctx.fillText("also",o.x,o.y+3); });
+    uPos.forEach(u=>{ ctx.fillStyle=a; ctx.beginPath(); ctx.arc(u.x,u.y,8,0,7); ctx.fill(); ctx.fillStyle="#fff"; ctx.font="9px "+cssv("--font-body"); ctx.textAlign="center"; ctx.fillText("👤",u.x,u.y+3); });
+    ctx.fillStyle=c; ctx.beginPath(); ctx.arc(movie.x,movie.y,18,0,7); ctx.fill(); ctx.fillStyle="#fff"; ctx.font="10px "+cssv("--font-body"); ctx.textAlign="center"; ctx.fillText("🎬",movie.x,movie.y+4);
+    ctx.fillStyle=faint; ctx.font="10px "+cssv("--font-body"); const cap=["click Traverse","RATED by these users…","…who also RATED these highly"][Math.min(step,2)]; ctx.fillText(cap,w/2,h-8);
+    raf=requestAnimationFrame(draw); };
+  draw(); note.textContent="A graph fact, not a score: movie → its raters → what THEY also liked. That's 'also liked by the same raters'.";
+  btn(btns,"▶ Traverse",()=>{ step=0; const iv=setInterval(()=>{ step++; if(step>=2) clearInterval(iv); },900); },true);
+  stage._stop=()=>{running=false;cancelAnimationFrame(raf);}; };
+
+FIGS.arrive=(stage,note,btns)=>{ stage.innerHTML="";
+  const wrap=document.createElement("div"); wrap.style.cssText="display:flex;flex-direction:column;gap:10px";
+  const two=document.createElement("div"); two.style.cssText="display:flex;gap:10px";
+  ["⚛️ React (via api.js)","🎈 Streamlit (direct)"].forEach(t=>{ const d=document.createElement("div");
+    d.style.cssText="flex:1;border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;font-size:12px;font-weight:600;background:var(--panel-2)"; d.textContent=t; two.appendChild(d); });
+  const arrow=document.createElement("div"); arrow.style.cssText="text-align:center;color:var(--faint);font-size:18px"; arrow.textContent="↓";
+  const eng=document.createElement("div"); eng.style.cssText="border:1px solid var(--b);border-radius:10px;padding:14px;text-align:center;background:var(--b-bg);font-weight:700;font-size:13px";
+  eng.innerHTML="one engine<br><span style='font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--muted)'>recommender.py · llm_chains.py · graph.py</span>";
+  wrap.appendChild(two); wrap.appendChild(arrow); wrap.appendChild(eng); stage.appendChild(wrap);
+  note.textContent="Two very different UIs, but both call the same Python pipeline — React over HTTP, Streamlit directly. One engine to reason about."; };
+
+FIGS.route=(stage,note,btns)=>{ stage.innerHTML="";
+  const q=document.createElement("div"); q.style.cssText="text-align:center;font-weight:700;margin-bottom:12px;font-size:13px"; q.textContent="Who's asking?";
+  stage.appendChild(q);
+  const opts=[["Returning user","has rating history","→ /recommendations (two-tower)","--b"],
+              ["New user","no history","→ /onboarding (content only)","--a"],
+              ["Free-text query","'funny sci-fi'","→ /chat (RAG search)","--c"]];
+  opts.forEach(o=>{ const d=document.createElement("button"); d.className="fbtn"; d.style.cssText="display:block;width:100%;text-align:left;margin-bottom:8px;cursor:pointer";
+    d.innerHTML=`<b style="color:${'var('+o[3]+')'}">${o[0]}</b> <span style="color:var(--muted)">— ${o[1]}</span><div style="font-family:var(--font-mono);font-size:11px;margin-top:3px">${o[2]}</div>`;
+    d.onclick=()=>{ note.textContent=o[0]+" "+o[1]+" "+o[2].replace('→','routes to'); }; stage.appendChild(d); });
+  note.textContent="The pipeline branches on who's asking — this is the cold-start solution: never run collaborative filtering on an unknown user."; };
+
+FIGS.cache=(stage,note,btns)=>{ stage.innerHTML="";
+  const log=document.createElement("div"); log.style.cssText="min-height:110px;font-family:"+cssv("--font-mono")+";font-size:12px"; stage.appendChild(log);
+  const line=(t,ms,hit)=>{ const d=document.createElement("div"); d.style.cssText="padding:6px 10px;margin:5px 0;border-radius:8px;border:1px solid var(--line);background:var(--panel-2);display:flex;justify-content:space-between";
+    d.innerHTML=`<span>${t}</span><span style="color:${hit?'var(--teal)':'var(--accent)'};font-weight:700">${ms}</span>`; log.appendChild(d); };
+  let n=0; const req=()=>{ n++; if(n===1){ line("#1 · MISS → run model → cache","~24 ms",false); note.textContent="First call: model runs, result cached as recs:{user}:{k}."; }
+    else { line("#"+n+" · HIT → from Redis","~1 ms",true); note.textContent="Repeat within 5-min TTL skips the model — ~24× faster, same result."; } }; req();
+  btn(btns,"↻ Request again",req,true); btn(btns,"🗑 Expire",()=>{ n=0; log.innerHTML=""; note.textContent="TTL expired (or feedback changed 'seen') → next call is a fresh MISS."; }); };
+
+FIGS.llm=(stage,note,btns)=>{ stage.innerHTML="";
+  const steps=[["1 · Parse","Haiku → intent",'{"search_text":"smart funny sci-fi"}'],
+    ["2 · Retrieve","E5 → 30 real movies","#50 · #172 · #181 …"],
+    ["3 · Re-rank","Sonnet, candidates only","[181, 50, 172, …]"],
+    ["4 · Explain","Haiku grounds a reason","“Clever, upbeat sci-fi — your ask.”"]];
+  const wrap=document.createElement("div"); wrap.style.cssText="display:flex;flex-direction:column;gap:8px"; stage.appendChild(wrap);
+  steps.forEach(s=>{ const d=document.createElement("div"); d.className="llmstep"; d.style.cssText="opacity:.25;transform:translateX(-6px);transition:all .4s;border:1px solid var(--line);border-left:3px solid var(--b);border-radius:9px;padding:9px 12px;background:var(--panel-2)";
+    d.innerHTML=`<div style="font-weight:700;font-size:12.5px">${s[0]} <span style="color:var(--muted);font-weight:500">— ${s[1]}</span></div><div style="font-family:${cssv('--font-mono')};font-size:11px;color:var(--b);margin-top:3px">${s[2]}</div>`; wrap.appendChild(d); });
+  const play=()=>{ wrap.querySelectorAll(".llmstep").forEach((e,i)=>setTimeout(()=>{ e.style.opacity=1; e.style.transform="none"; },i*550)); }; play();
+  note.textContent="The RAG chain: parse → retrieve → re-rank ONLY retrieved movies → explain the top pick. Grounded end to end.";
+  btn(btns,"▶ Run the chain",play,true); };
+
+FIGS.respond=(stage,note,btns)=>{ stage.innerHTML="";
+  const card=document.createElement("div"); card.style.cssText="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel-2)";
+  card.innerHTML=`<div style="display:flex;gap:12px;padding:12px">
+    <div style="width:52px;height:76px;border-radius:6px;background:linear-gradient(135deg,var(--b),var(--accent));flex:none"></div>
+    <div style="flex:1"><div style="font-weight:700;font-size:14px">Star Wars <span style="color:var(--faint);font-weight:400">(1977)</span></div>
+      <div style="display:flex;gap:5px;margin:6px 0"><span style="font-size:10px;background:var(--b-bg);color:var(--b);padding:2px 8px;border-radius:20px">Sci-Fi</span><span style="font-size:10px;background:var(--b-bg);color:var(--b);padding:2px 8px;border-radius:20px">Action</span></div>
+      <div style="font-family:${cssv('--font-mono')};font-size:11px;color:var(--gold)">score 0.912</div></div></div>
+    <div id="reveal" style="max-height:0;overflow:hidden;transition:max-height .4s;border-top:1px solid var(--line)"><div style="padding:10px 12px;font-size:12px;color:var(--muted)" id="revtext"></div></div>`;
+  stage.appendChild(card);
+  note.textContent="The finished card: real poster, real score, real genres. Click to reveal the on-demand panels.";
+  const show=(txt)=>{ const r=card.querySelector("#reveal"); card.querySelector("#revtext").innerHTML=txt; r.style.maxHeight="90px"; };
+  btn(btns,"💬 Why this?",()=>{ show("<b>/explain</b> — “Epic, upbeat sci-fi adventure — matches your ask, grounded in real genres + plot.”"); note.textContent="/explain returns a grounded reason — never invented."; },true);
+  btn(btns,"🕸 Graph insights",()=>{ show("<b>/graph/insights</b> — 501 raters · also liked: Return of the Jedi, Raiders of the Lost Ark"); note.textContent="/graph/insights returns real crowd facts from Neo4j."; }); };
+
+FIGS.react=(stage,note,btns)=>{ stage.innerHTML="";
+  const card=document.createElement("div"); card.style.cssText="border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--panel-2);text-align:center";
+  card.innerHTML=`<div style="font-size:14px;font-weight:700;margin-bottom:10px">Was this a good pick?</div><div style="display:flex;gap:10px;justify-content:center"></div><div id="fbmsg" style="margin-top:12px;font-size:12px;color:var(--muted);min-height:18px"></div>`;
+  const row=card.querySelector("div[style*=justify-content]");
+  [["👍 Like",true],["👎 Skip",false]].forEach(([t,pos])=>{ const b=document.createElement("button"); b.className="fbtn"+(pos?" primary":""); b.textContent=t;
+    b.onclick=()=>{ card.querySelector("#fbmsg").innerHTML=`<span style='font-family:var(--font-mono)'>POST /feedback</span> · {movie_id, clicked:${pos}}`; note.textContent=pos?"A like becomes a new positive interaction for the next retrain.":"A skip is a negative signal — equally useful."; }; row.appendChild(b); });
+  stage.appendChild(card);
+  note.textContent="Every reaction is one POST /feedback. Click one to see the payload."; };
+
+FIGS.feedback=(stage,note,btns)=>{ stage.innerHTML="";
+  const box=document.createElement("div"); box.style.cssText="font-family:"+cssv("--font-mono")+";font-size:11.5px";
+  box.innerHTML=`<div style="color:var(--faint);display:grid;grid-template-columns:1fr 1fr 1fr .8fr;gap:6px;padding:0 8px 6px;border-bottom:1px solid var(--line)"><span>user</span><span>movie</span><span>signal</span><span>store</span></div>`;
+  stage.appendChild(box);
+  const rows=[["42","181","like","pg"],["42","50","rating 5","pg"],["7","172","skip","pg"]];
+  const add=(r,i)=>{ const d=document.createElement("div"); d.style.cssText="opacity:0;display:grid;grid-template-columns:1fr 1fr 1fr .8fr;gap:6px;padding:7px 8px;border-radius:6px;transition:opacity .4s;"+(i%2?"":"background:var(--panel-2)");
+    d.innerHTML=`<span>${r[0]}</span><span>${r[1]}</span><span style="color:var(--c)">${r[2]}</span><span style="color:var(--teal)">${r[3]}</span>`; box.appendChild(d); setTimeout(()=>d.style.opacity=1,i*300); };
+  const play=()=>{ box.querySelectorAll("div[style*=opacity]").forEach(d=>d.remove()); rows.forEach(add); }; play();
+  note.textContent="Each event is a durable row (Postgres, or SQLite if it's down). This is what accumulates into retraining data.";
+  btn(btns,"▶ Log events",play,true);
+  btn(btns,"⚠ Postgres down",()=>{ note.textContent="No Postgres → writes to SQLite (feedback.db). The loop never silently breaks."; }); };
+
+FIGS.loop=(stage,note,btns)=>{ const {ctx,w,h}=makeCanvas(stage,220);
+  const nodes=[["feedback rows",0.5,0.16],["retrain two-tower",0.84,0.55],["new two_tower.pt",0.5,0.86],["fresher recs",0.16,0.55]]; let t=0,raf;
+  const draw=()=>{ ctx.clearRect(0,0,w,h); const acc=cssv("--accent"),ink=cssv("--ink"),c=cssv("--c"),b=cssv("--b");
+    const P=nodes.map(n=>({x:n[1]*w,y:n[2]*h,label:n[0]}));
+    for(let i=0;i<P.length;i++){ const A=P[i],B=P[(i+1)%P.length]; ctx.strokeStyle=cssv("--line-strong"); ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.lineTo(B.x,B.y); ctx.stroke();
+      const tp=(t*0.008+i*0.25)%1,px=A.x+(B.x-A.x)*tp,py=A.y+(B.y-A.y)*tp; ctx.fillStyle=acc; ctx.beginPath(); ctx.arc(px,py,4,0,7); ctx.fill(); }
+    P.forEach((p,i)=>{ const col=[c,b,acc,b][i]; ctx.fillStyle=col; ctx.globalAlpha=0.15; ctx.beginPath(); ctx.roundRect(p.x-56,p.y-15,112,30,8); ctx.fill(); ctx.globalAlpha=1;
+      ctx.strokeStyle=col; ctx.lineWidth=1.5; ctx.beginPath(); ctx.roundRect(p.x-56,p.y-15,112,30,8); ctx.stroke();
+      ctx.fillStyle=ink; ctx.font="600 11px "+cssv("--font-body"); ctx.textAlign="center"; ctx.fillText(p.label,p.x,p.y+4); });
+    t++; raf=requestAnimationFrame(draw); };
+  draw(); note.textContent="The loop closes: stored feedback → retrain → new weights → the short cache TTL means fresher recs surface quickly. A living model, not a frozen one.";
+  stage._stop=()=>cancelAnimationFrame(raf); };
+
+/* ---------- boot / theme ---------- */
+function toggleTheme(){ const cur=document.documentElement.getAttribute("data-theme");
+  const sysDark=window.matchMedia("(prefers-color-scheme: dark)").matches; const now=cur?cur:(sysDark?"dark":"light");
+  document.documentElement.setAttribute("data-theme", now==="dark"?"light":"dark");
+  const open=location.hash.slice(1); if(open && S[open]) openStep(open); }
+buildLanes();
+window.addEventListener("load",()=>{ const h=location.hash.slice(1); if(h && S[h]) openStep(h); });
+window.addEventListener("hashchange",()=>{ const h=location.hash.slice(1); if(!h) showMap(); });
+window.addEventListener("resize",()=>{ const h=location.hash.slice(1); if(h && S[h]) openStep(h); });
+</script>
+</body>
+</html>
