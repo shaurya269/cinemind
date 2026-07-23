@@ -7,6 +7,13 @@ plus the FastAPI backend (Phase 2), React frontend (Phase 3), and Streamlit
 demo (Phase 3.5) that were built on top of it. See `CLAUDE.md` for the full
 architecture and current build status.
 
+> **Fastest way to run everything** (Windows): from this folder, run
+> `.\setup_and_run.ps1`. It installs prerequisites, sets up the Python venv,
+> downloads the dataset, runs the training pipeline if needed, prompts for
+> API keys, starts the Docker backend stack, and launches the React frontend
+> — all in one go, safe to re-run. See the top-level repo README for details.
+> The manual steps below are for anyone who wants to run each part by hand.
+
 ## What Phase 1 contains
 
 | Script | What it does |
