@@ -2,6 +2,12 @@
 
 **An LLM-Augmented Hybrid Deep Learning Framework for Personalised, Explainable, and Conversational Movie & Show Recommendation**
 
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-two--tower-EE4C2C?logo=pytorch&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-Vite-61DAFB?logo=react&logoColor=black)
+![License](https://img.shields.io/badge/license-unlicensed-lightgrey)
+
 CineMind is a full-stack movie/TV recommendation system that combines a
 PyTorch two-tower deep learning model (collaborative filtering) with an LLM
 reasoning layer (Claude API or Groq, via LangChain) to deliver personalised,
@@ -54,17 +60,13 @@ optional) and write `cinemind_phase1/.env` for you.
 
 ## Architecture at a glance
 
-```
-Data (MovieLens 100K + OMDb)
-  -> Embedding pipeline (E5 content vectors + two-tower collaborative model)
-  -> Storage (Qdrant / Neo4j / Redis / Postgres)
-  -> Online pipeline (candidate generation -> ranking -> LLM reasoning -> graph insights)
-  -> FastAPI backend
-  -> React frontend / Streamlit public demo
-```
+![CineMind system architecture: data layer through embeddings, storage, the online recommendation pipeline, FastAPI backend, and React/Streamlit frontends](docs/images/architecture.svg)
 
 Full details, verified build status, and every design decision are documented in
-[`cinemind_phase1/CLAUDE.md`](cinemind_phase1/CLAUDE.md).
+[`cinemind_phase1/CLAUDE.md`](cinemind_phase1/CLAUDE.md). Interactive versions of
+this diagram (plus a project-phase status board and a request-level data-flow
+diagram) live in
+[`cinemind_phase1/System Architecture/`](cinemind_phase1/System%20Architecture).
 
 ## Project layout
 
@@ -91,6 +93,17 @@ deploying to Render/Vercel/Streamlit Cloud).
 
 ## Tech stack
 
-PyTorch • intfloat/e5-small-v2 • Qdrant • Neo4j • Redis • PostgreSQL •
-Claude API / Groq (via LangChain) • Langfuse • FastAPI • React (Vite) •
-Streamlit
+| Layer | Tools |
+|---|---|
+| Modeling | PyTorch (two-tower), `intfloat/e5-small-v2` content embeddings |
+| Storage | Qdrant (vectors) · Neo4j (graph) · Redis (cache) · PostgreSQL (feedback) |
+| LLM reasoning | Claude API or Groq, orchestrated with LangChain, traced with Langfuse |
+| Backend | FastAPI, Docker Compose |
+| Frontend | React (Vite) · Streamlit (public demo) |
+
+## Screenshots
+
+Not yet committed — see [`cinemind_phase1/frontend`](cinemind_phase1/frontend)
+to run the React UI locally (`setup_and_run.ps1` handles this for you), or
+[`cinemind_phase1/streamlit_app`](cinemind_phase1/streamlit_app) for the
+public-demo version. Contributions of real UI screenshots welcome.

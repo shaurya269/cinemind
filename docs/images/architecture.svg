@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6472"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="760" fill="#ffffff"/>
+
+  <text x="600" y="40" text-anchor="middle" font-size="24" font-weight="700" fill="#1a1d23">CineMind — System Architecture</text>
+  <text x="600" y="64" text-anchor="middle" font-size="13" fill="#5b6472">Hybrid two-tower + content embeddings, ranked and explained by an LLM reasoning layer</text>
+
+  <!-- Layer 1: Data -->
+  <g>
+    <rect x="40" y="96" width="1120" height="64" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+    <text x="60" y="122" font-size="13" font-weight="700" fill="#4338ca">L1 · DATA</text>
+    <text x="60" y="144" font-size="12.5" fill="#312e81">MovieLens 100K (ratings + item metadata)   ·   OMDb API (poster / plot / cast, title+year matched)</text>
+  </g>
+
+  <line x1="600" y1="160" x2="600" y2="184" stroke="#5b6472" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Layer 2: Embedding pipeline -->
+  <g>
+    <rect x="40" y="184" width="1120" height="76" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
+    <text x="60" y="210" font-size="13" font-weight="700" fill="#047857">L2 · EMBEDDING PIPELINE (offline, batch)</text>
+    <text x="60" y="232" font-size="12.5" fill="#065f46">Content: intfloat/e5-small-v2 on (title + genres)   ·   Collaborative: two-tower PyTorch model</text>
+    <text x="60" y="250" font-size="12.5" fill="#065f46">trained on implicit feedback (rating ≥ 4), temporal split, in-batch negatives + logQ correction</text>
+  </g>
+
+  <line x1="600" y1="260" x2="600" y2="284" stroke="#5b6472" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Layer 3: Storage -->
+  <g>
+    <rect x="40" y="284" width="1120" height="96" rx="10" fill="#fff7ed" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="60" y="310" font-size="13" font-weight="700" fill="#b45309">L3 · STORAGE</text>
+
+    <g>
+      <rect x="60" y="322" width="255" height="46" rx="8" fill="#ffffff" stroke="#f2b356"/>
+      <text x="187" y="341" text-anchor="middle" font-size="12" font-weight="600" fill="#92400e">Qdrant</text>
+      <text x="187" y="357" text-anchor="middle" font-size="10.5" fill="#78716c">collab-vector ANN search</text>
+    </g>
+    <g>
+      <rect x="330" y="322" width="255" height="46" rx="8" fill="#ffffff" stroke="#f2b356"/>
+      <text x="457" y="341" text-anchor="middle" font-size="12" font-weight="600" fill="#92400e">Neo4j</text>
+      <text x="457" y="357" text-anchor="middle" font-size="10.5" fill="#78716c">User–rated–Movie–genre graph</text>
+    </g>
+    <g>
+      <rect x="600" y="322" width="255" height="46" rx="8" fill="#ffffff" stroke="#f2b356"/>
+      <text x="727" y="341" text-anchor="middle" font-size="12" font-weight="600" fill="#92400e">Redis</text>
+      <text x="727" y="357" text-anchor="middle" font-size="10.5" fill="#78716c">recs cache-aside, 5 min TTL</text>
+    </g>
+    <g>
+      <rect x="870" y="322" width="270" height="46" rx="8" fill="#ffffff" stroke="#f2b356"/>
+      <text x="1005" y="341" text-anchor="middle" font-size="12" font-weight="600" fill="#92400e">PostgreSQL</text>
+      <text x="1005" y="357" text-anchor="middle" font-size="10.5" fill="#78716c">feedback log (SQLite fallback)</text>
+    </g>
+  </g>
+
+  <line x1="600" y1="380" x2="600" y2="404" stroke="#5b6472" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Layer 4: Online pipeline -->
+  <g>
+    <rect x="40" y="404" width="1120" height="120" rx="10" fill="#fdf2f8" stroke="#ec4899" stroke-width="1.5"/>
+    <text x="60" y="430" font-size="13" font-weight="700" fill="#be185d">L4 · ONLINE PIPELINE (per request)</text>
+
+    <g>
+      <rect x="60" y="444" width="245" height="62" rx="8" fill="#ffffff" stroke="#f4a8ce"/>
+      <text x="182" y="464" text-anchor="middle" font-size="11.5" font-weight="600" fill="#9d174d">1 · Candidate gen</text>
+      <text x="182" y="480" text-anchor="middle" font-size="10.5" fill="#78716c">cosine search over content</text>
+      <text x="182" y="494" text-anchor="middle" font-size="10.5" fill="#78716c">vectors → ~30 candidates</text>
+    </g>
+    <g>
+      <rect x="320" y="444" width="245" height="62" rx="8" fill="#ffffff" stroke="#f4a8ce"/>
+      <text x="442" y="464" text-anchor="middle" font-size="11.5" font-weight="600" fill="#9d174d">2 · Ranking</text>
+      <text x="442" y="480" text-anchor="middle" font-size="10.5" fill="#78716c">two-tower dot product +</text>
+      <text x="442" y="494" text-anchor="middle" font-size="10.5" fill="#78716c">0.30 × log-popularity prior</text>
+    </g>
+    <g>
+      <rect x="580" y="444" width="290" height="62" rx="8" fill="#ffffff" stroke="#f4a8ce"/>
+      <text x="725" y="464" text-anchor="middle" font-size="11.5" font-weight="600" fill="#9d174d">3 · LLM reasoning (LangChain)</text>
+      <text x="725" y="480" text-anchor="middle" font-size="10.5" fill="#78716c">parse query → re-rank top 30→10 →</text>
+      <text x="725" y="494" text-anchor="middle" font-size="10.5" fill="#78716c">"why this?" → cold-start onboarding</text>
+    </g>
+    <g>
+      <rect x="885" y="444" width="255" height="62" rx="8" fill="#ffffff" stroke="#f4a8ce"/>
+      <text x="1012" y="464" text-anchor="middle" font-size="11.5" font-weight="600" fill="#9d174d">4 · Graph insights</text>
+      <text x="1012" y="480" text-anchor="middle" font-size="10.5" fill="#78716c">co-raters + shared-genre</text>
+      <text x="1012" y="494" text-anchor="middle" font-size="10.5" fill="#78716c">movies via Neo4j traversal</text>
+    </g>
+    <text x="1100" y="520" text-anchor="end" font-size="10" fill="#9d174d" font-style="italic">traced end-to-end in Langfuse</text>
+  </g>
+
+  <line x1="600" y1="524" x2="600" y2="548" stroke="#5b6472" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Layer 5: Backend -->
+  <g>
+    <rect x="40" y="548" width="1120" height="76" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="60" y="574" font-size="13" font-weight="700" fill="#1d4ed8">L5 · BACKEND — FastAPI</text>
+    <text x="60" y="596" font-size="12" fill="#1e3a8a">/recommendations · /chat · /onboarding · /feedback · /explain · /graph/insights · /health</text>
+    <text x="60" y="614" font-size="11" fill="#475569">Docker Compose: API + Qdrant + Postgres + Redis + Neo4j (Langfuse Cloud)</text>
+  </g>
+
+  <line x1="600" y1="624" x2="600" y2="648" stroke="#5b6472" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Layer 6: Frontend -->
+  <g>
+    <rect x="40" y="648" width="1120" height="76" rx="10" fill="#fef2f2" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="60" y="674" font-size="13" font-weight="700" fill="#b91c1c">L6 · FRONTEND</text>
+    <text x="60" y="696" font-size="12" fill="#7f1d1d">React (Vite) — recommendation cards, chat search, onboarding wizard, watchlist, graph insights panel</text>
+    <text x="60" y="714" font-size="11" fill="#7f1d1d">Streamlit public demo — same pipeline, no API hop, deployable to Streamlit Community Cloud</text>
+  </g>
+
+  <text x="600" y="748" text-anchor="middle" font-size="10.5" fill="#9aa1ac">MovieLens 100K benchmark — Two-tower + pop prior: 0.093 Precision@10 / 0.126 Recall@10 (+55% / +83% over popularity baseline)</text>
+</svg>
